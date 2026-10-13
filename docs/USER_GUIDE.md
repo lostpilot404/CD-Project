@@ -74,7 +74,8 @@ stores the run. *Load example…* fills the editor from the bundled corpus, and
 *Clear* empties it.
 
 Diagnostics (lexer, parser, semantic, CFG, data-flow) are listed with their
-`line:col`; the run summary states whether the analysis was complete, and lists
+`line:col`, plus any rule diagnostics for the rule set the run used; the run
+summary states whether the analysis was complete, and lists
 everything that was outside the supported subset. A file that does not parse is
 **not** presented as analysed.
 
@@ -109,25 +110,31 @@ The list on the left, the evidence for the selected finding on the right.
 
 The *Graph* selector switches between the **Program dependency graph** (data,
 control, call, return, taint, sanitize, define and source-to-sink edges, each
-with its reason), the **Control-flow graph** of one function, and the
+with its reason), the **Control-flow graph** of one function (pick the function;
+blocks are drawn with their typed edges — sequential, true/false, loop-back,
+return, break, continue, exit), and the
 **Function-level call view**. The *Edge kinds* fieldset filters the dependency
 view. Selecting a node shows its statement, its line, the definitions that reach
 it and the taint atoms that reach it. Large graphs are truncated with a visible
-warning instead of being silently cut.
+warning instead of being silently cut. When the run was analysed with the
+dependency-graph option switched off, the page says so instead of failing.
 
 ### Data-Flow Analysis
 
-Per function: the basic blocks with their statements and typed successor edges,
-the analysis selector, the per-block IN/OUT values, the per-statement states
-replayed after the fixpoint, iteration counts and convergence, and — for definite
+Per function: the equations, the direction, the worklist statistics (iterations,
+steps, convergence, processing order), the per-block IN/OUT values, the
+per-statement states replayed after the fixpoint, and — for definite
 assignment — the reads that may happen before an assignment (`DFA001`).
+Clicking a statement id shows that statement's reaching definitions, live
+variables, taint and control dependencies below the tables.
 
 ### Program Slicing
 
 Choose a criterion (a statement from the current run) and a direction
 (backward or forward): the slice, the reason each statement is included, and the
 induced dependency subgraph. The security slice of a finding is one click away
-from the Findings page. The panel states that slices are conservative
+from the Findings page. Clicking a statement id shows that statement's analysis
+results below the subgraph. The panel states that slices are conservative
 over-approximations.
 
 ### Rule Editor
@@ -145,7 +152,7 @@ that does not validate is rejected with `line:col` before any analysis runs.
 
 *Download JSON report* and *Open HTML report* export the current run; the HTML
 report is self-contained and escapes all analysed text. In the *Compare* panel,
-type the earlier and the later run id and press *Run comparison*: the buckets show
+type the earlier and the later run id and press *Compare*: the buckets show
 new / resolved / persistent / moved, and the Findings page then offers the status
 filter described above. Identity is the flow, so inserting lines above a finding
 makes it *moved*, not *new*.

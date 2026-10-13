@@ -47,15 +47,51 @@ export function update(patch) {
 }
 
 export function resetRun() {
+  // Clearing a run must not leave the previous run's artefacts behind: every
+  // view decides whether to fetch from the presence of its own `data`, so a
+  // stale payload would be shown as if it belonged to the next run.  View
+  // preferences (graph mode/kinds, analysis, direction) are kept; everything
+  // that describes the run itself is dropped.
   update({
     run: null,
     source: '',
+    statementsById: {},
     selectedFinding: null,
     selectedFindingDetail: null,
     selectedStatement: null,
+    statementDetail: null,
     comparison: null,
+    compareBefore: null,
+    compareAfter: null,
     filters: { severity: '', category: '', rule: '', certainty: '', file: '', status: '', search: '' },
-    dataflow: { function: null, analysis: 'reaching' },
-    slicing: { sid: null, direction: 'backward', source: 'statement' },
+    graph: { ...state.graph, data: null, loadError: null, focus: null },
+    dataflow: { ...state.dataflow, function: null, data: null, error: null },
+    slicing: { ...state.slicing, sid: null, source: 'statement', data: null, error: null },
+  });
+}
+
+/**
+ * Drop every artefact of the previous run when a new analysis completes.
+ *
+ * Called with the fresh run payload; view preferences are preserved.  Without
+ * this the graph, data-flow and slicing pages keep showing the previous run's
+ * results after a re-analysis, because they only fetch when their `data` is
+ * empty.
+ */
+export function resetForNewRun(run, source) {
+  update({
+    run,
+    source,
+    statementsById: {},
+    selectedFinding: null,
+    selectedFindingDetail: null,
+    selectedStatement: null,
+    statementDetail: null,
+    comparison: null,
+    compareBefore: null,
+    compareAfter: null,
+    graph: { ...state.graph, data: null, loadError: null, focus: null },
+    dataflow: { ...state.dataflow, function: null, data: null, error: null },
+    slicing: { ...state.slicing, sid: null, source: 'statement', data: null, error: null },
   });
 }

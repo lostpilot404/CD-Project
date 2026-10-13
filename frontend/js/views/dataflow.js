@@ -9,6 +9,7 @@
  */
 import { el, render } from '../lib/dom.js';
 import { api } from '../api.js';
+import { renderStatementDetail } from './statement.js';
 
 const ANALYSES = [
   ['reaching', 'Reaching definitions', 'OUT = GEN ∪ (IN − KILL), IN = ∪ OUT[P]', 'forward'],
@@ -55,6 +56,10 @@ export function renderDataflow(container, { state, onFunction, onAnalysis, onSel
   ]));
 
   const [key, label, equations] = ANALYSES.find((entry) => entry[0] === state.dataflow.analysis) || ANALYSES[0];
+  if (state.dataflow.error) {
+    render(body, el('p', { class: 'alert alert--error', text: `Could not load the data-flow results: ${state.dataflow.error}` }));
+    return;
+  }
   const data = state.dataflow.data;
   if (!data) {
     render(body, el('p', {}, [el('span', { class: 'spinner' }), ' running the analysis…']));
@@ -71,10 +76,11 @@ export function renderDataflow(container, { state, onFunction, onAnalysis, onSel
       el('td', { class: 'mono', text: (block.out || []).join(', ') || '∅' }),
     ]));
 
+  const statementsById = state.statementsById || {};
   const statementRows = Object.entries(data.statement_states || {}).map(([sid, states]) =>
     el('tr', {}, [
       el('td', {}, el('button', { type: 'button', class: 'button button--small', text: sid, on: { click: () => onSelectStatement(Number(sid)) } })),
-      el('td', { class: 'mono', text: data.state_labels ? '[in]' : '[in]' }),
+      el('td', { class: 'mono', text: statementsById[sid] || '—' }),
       el('td', { class: 'mono', text: Array.isArray(states.in) ? states.in.join(', ') || '∅' : String(states.in) }),
       el('td', { class: 'mono', text: Array.isArray(states.out) ? states.out.join(', ') || '∅' : String(states.out) }),
     ]));
@@ -96,9 +102,11 @@ export function renderDataflow(container, { state, onFunction, onAnalysis, onSel
     el('h3', { text: 'Per-statement states' }),
     el('p', { class: 'hint', text: 'Values between statements, produced by replaying the transfer function inside each block after the fixed point was reached.' }),
     el('table', { class: 'data' }, [
-      el('thead', {}, el('tr', {}, ['statement', '', 'IN', 'OUT'].map((h) => el('th', { text: h })))),
+      el('thead', {}, el('tr', {}, ['statement', 'statement text', 'IN', 'OUT'].map((h) => el('th', { text: h })))),
       el('tbody', {}, statementRows),
     ]),
+    el('h3', { text: 'Selected statement' }),
+    renderStatementDetail(state.statementDetail),
     (data.uninitialised_reads || []).length
       ? el('div', {}, [
           el('h3', { text: 'Uses that may happen before assignment' }),

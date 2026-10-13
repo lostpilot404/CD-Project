@@ -259,6 +259,9 @@ code, kbd, pre, .mono { font-family: var(--mono); font-size: .9em; }
 }
 .finding-card:focus-within { outline: 2px solid var(--accent); }
 
+/* Panels that hold wide tables scroll horizontally on narrow screens instead of
+   pushing the page wider than the viewport. */
+.panel:has(table.data) { overflow-x: auto; }
 table.data { width: 100%; border-collapse: collapse; font-size: .88rem; }
 table.data th, table.data td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
 table.data th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
@@ -266,8 +269,6 @@ table.data tbody tr:hover { background: var(--surface-alt); }
 table.data td.num { font-variant-numeric: tabular-nums; text-align: right; }
 
 .source {
-  display: grid;
-  grid-template-columns: 3.2rem minmax(0, 1fr);
   font-family: var(--mono);
   font-size: .82rem;
   border: 1px solid var(--border);
@@ -276,7 +277,18 @@ table.data td.num { font-variant-numeric: tabular-nums; text-align: right; }
   max-height: 28rem;
   background: var(--surface);
 }
-.source__lines { margin: 0; padding: 0; list-style: none; }
+/* The grid lives on the list itself: it is the parent of the rows, and the
+   rows (display: contents) lend their two cells to these columns.  Putting the
+   grid on .source instead squeezed the whole list into the 3.2rem gutter
+   column, because the list was the grid's only child. */
+.source__lines {
+  display: grid;
+  grid-template-columns: 3.2rem minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: max-content;
+}
 .source__line { display: contents; }
 .source__gutter {
   color: var(--muted);
@@ -313,9 +325,16 @@ table.data td.num { font-variant-numeric: tabular-nums; text-align: right; }
 .graph-svg .edge--call, .graph-svg .edge--return { stroke: var(--accent); }
 .graph-svg .edge--sanitize { stroke: var(--ok); stroke-dasharray: 2 2; }
 .graph-svg .edge--define { stroke: #7a5195; }
+/* Control-flow edge kinds: the taken branch is solid, the untaken one dashed,
+   and the edge that closes a loop reads as a loop. */
+.graph-svg .edge--true { stroke: var(--ok); stroke-width: 1.6; }
+.graph-svg .edge--false { stroke: var(--medium); stroke-dasharray: 4 3; }
+.graph-svg .edge--loop-back { stroke: var(--accent); stroke-dasharray: 2 2; stroke-width: 1.6; }
+.graph-svg .edge--break, .graph-svg .edge--continue { stroke: var(--high); stroke-dasharray: 4 3; }
 .graph-svg .node rect { fill: var(--surface); stroke: var(--border); }
 .graph-svg .node--definition rect { fill: #f4f0fb; }
 .graph-svg .node--function rect { fill: var(--accent-weak); }
+.graph-svg .node--block rect { fill: var(--surface-alt); stroke-width: 1.4; }
 .graph-svg .node text { font: 11px var(--mono); fill: var(--text); }
 .graph-svg .node--selected rect { stroke: var(--accent); stroke-width: 2.5; }
 .graph-svg .node { cursor: pointer; }
@@ -328,6 +347,13 @@ table.data td.num { font-variant-numeric: tabular-nums; text-align: right; }
 .legend__swatch--call { background: var(--accent); }
 .legend__swatch--sanitize { background: var(--ok); }
 .legend__swatch--define { background: #7a5195; }
+.legend__swatch--cfg-sequential { background: var(--muted); }
+.legend__swatch--cfg-true { background: var(--ok); }
+.legend__swatch--cfg-false { background: repeating-linear-gradient(90deg, var(--medium) 0 4px, transparent 4px 7px); }
+.legend__swatch--cfg-loop-back { background: repeating-linear-gradient(90deg, var(--accent) 0 2px, transparent 2px 4px); }
+.legend__swatch--cfg-return { background: var(--accent); }
+.legend__swatch--cfg-break, .legend__swatch--cfg-continue { background: repeating-linear-gradient(90deg, var(--high) 0 4px, transparent 4px 7px); }
+.legend__swatch--cfg-exit { background: var(--muted); }
 
 .evidence-path { list-style: none; margin: 0; padding: 0; counter-reset: step; }
 .evidence-path li {

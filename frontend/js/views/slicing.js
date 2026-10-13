@@ -9,6 +9,7 @@
 import { el, render } from '../lib/dom.js';
 import { api } from '../api.js';
 import { renderGraph } from '../graph.js';
+import { renderStatementDetail } from './statement.js';
 
 export function renderSlicing(container, { state, onCriterion, onDirection, onSelectStatement }) {
   const toolbar = container.querySelector('#slicing-toolbar');
@@ -50,6 +51,17 @@ export function renderSlicing(container, { state, onCriterion, onDirection, onSe
     el('p', { class: 'hint', text: 'A security slice for a finding is available from the Findings page.' }),
   ]));
 
+  if (run.summary && run.summary.slicing_available === false) {
+    render(body, el('p', {
+      class: 'empty-state',
+      text: 'Slices were not built for this run: the analysis ran with “Build the program dependency graph and slices” switched off. Run the analysis again with that option enabled to slice it.',
+    }));
+    return;
+  }
+  if (state.slicing.error) {
+    render(body, el('p', { class: 'alert alert--error', text: `Could not compute the slice: ${state.slicing.error}` }));
+    return;
+  }
   const slice = state.slicing.data;
   if (!slice) {
     render(body, el('p', {}, [el('span', { class: 'spinner' }), ' computing the slice…']));
@@ -65,15 +77,20 @@ export function renderSlicing(container, { state, onCriterion, onDirection, onSe
       el('td', { text: (slice.reasons[String(statement.sid)] || []).join(' · ') }),
     ]));
 
+  const facts = [
+    el('dt', { text: 'criterion' }),
+    el('dd', { text: slice.criterion.text ? `line ${slice.criterion.line}: ${slice.criterion.text}` : JSON.stringify(slice.criterion) }),
+  ];
+  if (slice.finding_id) {
+    facts.push(el('dt', { text: 'finding' }), el('dd', { class: 'mono', text: slice.finding_id }));
+  }
+  facts.push(
+    el('dt', { text: 'truncated' }), el('dd', { text: slice.truncated ? 'yes — the statement limit was reached' : 'no' }),
+    el('dt', { text: 'note' }), el('dd', { text: slice.note }),
+  );
   render(body, [
     el('h2', { text: `${slice.kind} slice (${slice.statements.length} statement(s))` }),
-    el('dl', { class: 'kv' }, [
-      el('dt', { text: 'criterion' }),
-      el('dd', { text: slice.criterion.text ? `line ${slice.criterion.line}: ${slice.criterion.text}` : JSON.stringify(slice.criterion) }),
-      el('dt', { text: 'finding' }), slice.finding_id ? el('dd', { class: 'mono', text: slice.finding_id }) : null,
-      el('dt', { text: 'truncated' }), el('dd', { text: slice.truncated ? 'yes — the statement limit was reached' : 'no' }),
-      el('dt', { text: 'note' }), el('dd', { text: slice.note }),
-    ]),
+    el('dl', { class: 'kv' }, facts),
     el('h3', { text: 'Statements in the slice' }),
     el('table', { class: 'data' }, [
       el('thead', {}, el('tr', {}, ['sid', 'line:col', 'function', 'statement', 'why it is included'].map((h) => el('th', { text: h })))),
@@ -85,6 +102,8 @@ export function renderSlicing(container, { state, onCriterion, onDirection, onSe
       onSelect: (node) => { if (node.sid >= 0) onSelectStatement(node.sid); },
       emptyMessage: 'This slice has no dependencies between its statements.',
     }),
+    el('h3', { text: 'Selected statement' }),
+    renderStatementDetail(state.statementDetail),
   ]);
   return container;
 }

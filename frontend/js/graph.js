@@ -82,10 +82,12 @@ function buildSvg(nodes, edges, options) {
   const root = svg('svg', {
     class: 'graph-svg',
     viewBox: `0 0 ${width} ${height}`,
-    // Natural width, not 100%: a layered graph with many columns scaled down to
-    // the canvas becomes unreadable, so the canvas scrolls instead.
+    // Natural size, not 100%: a layered graph scaled down to fit the canvas
+    // becomes unreadable, so the canvas scrolls instead.  The height attribute
+    // must match the viewBox height — capping it here used to shrink tall
+    // graphs into an unreadable strip.
     width: width,
-    height: Math.max(240, Math.min(height, 900)),
+    height: Math.max(240, height),
     role: 'img',
     'aria-label': `Program graph with ${nodes.length} nodes and ${drawn.length} edges`,
   });

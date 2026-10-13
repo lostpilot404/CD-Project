@@ -363,6 +363,60 @@ class AnalysisEndpointTests(ApiTestCase):
         self.assertIn("subgraph", security)
         self.assertTrue(security["subgraph"]["nodes"])
 
+    def test_disabling_the_builtin_rules_without_a_replacement_analyses_with_no_rules(self):
+        # Regression: the API once ignored ``use_builtin_rules: false`` when no
+        # custom rule file was submitted and analysed with the built-in rules
+        # anyway, reporting findings the caller asked not to look for.
+        run = self.json_post(
+            "/api/analyze",
+            {"source": VULNERABLE, "filename": "norules.ctc", "use_builtin_rules": False},
+        )
+        self.assertEqual(run["summary"]["findings"], 0, run["findings"])
+        self.assertEqual(run["rules"]["sources"], 0)
+        self.assertEqual(run["rules"]["sinks"], 0)
+        self.assertEqual(run["rules"]["flows"], 0)
+        self.assertEqual(run["rule_diagnostics"], [])
+
+    def test_skipping_dependencies_keeps_findings_but_disables_graph_and_slices(self):
+        run = self.json_post(
+            "/api/analyze",
+            {"source": VULNERABLE, "filename": "nodeps.ctc", "run_dependencies": False},
+        )
+        self.assertEqual(run["summary"]["findings"], 1, "taint findings need no graph")
+        self.assertEqual(run["metrics"]["dependency_edges"], 0)
+        self.assertEqual(run["metrics"]["dependency_nodes"], 0)
+        self.assertIs(run["summary"]["dependencies_built"], False)
+        self.assertIs(run["summary"]["slicing_available"], False)
+        run_id = run["run_id"]
+        self.assertEqual(
+            self.error_of(f"/api/runs/{run_id}/graph", expected=409)["code"],
+            "graph-unavailable",
+        )
+        self.assertEqual(
+            self.error_of(f"/api/runs/{run_id}/slice?sid=1", expected=409)["code"],
+            "slicing-unavailable",
+        )
+        finding_id = run["findings"][0]["id"]
+        self.assertEqual(
+            self.error_of(f"/api/runs/{run_id}/findings/{finding_id}/slice",
+                          expected=409)["code"],
+            "slicing-unavailable",
+        )
+
+    def test_runs_state_whether_graph_and_slices_were_built(self):
+        run = self.analyse(VULNERABLE)
+        self.assertIs(run["summary"]["dependencies_built"], True)
+        self.assertIs(run["summary"]["slicing_available"], True)
+
+    def test_option_flags_must_be_booleans(self):
+        for field in ("use_builtin_rules", "run_dependencies"):
+            with self.subTest(field=field):
+                error = self.error_of(
+                    "/api/analyze", "POST",
+                    {"source": VULNERABLE, field: "false"}, expected=400,
+                )
+                self.assertEqual(error["code"], "invalid-parameter")
+
     def test_report_in_html_is_self_contained_and_escaped(self):
         hostile = 'int main() { string cmd = input(); system("<script>alert(1)</script>" + cmd); return 0; }'
         run = self.analyse(hostile, filename="hostile.ctc")

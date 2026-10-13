@@ -91,7 +91,7 @@ productions, its LALR table 78 states, 0 conflicts (`/api/rules` →
 * **Interface**: Overview, Analyze Code, Findings, Program Graph, Data-Flow
   Analysis, Program Slicing, Rule Editor, Reports, Documentation — all nine
   render real content and are covered by `frontend/tests/views.test.js` against a
-  real engine over HTTP (30 tests).
+  real engine over HTTP (39 tests).
 * **Findings** carry a stable id (independent of line numbers), rule id,
   category, severity, confidence, certainty, source/sink positions, the evidence
   path, branch conditions, sanitizers seen and *why they did not neutralise the
@@ -122,8 +122,8 @@ explicit account of it:
 
 | Suite | Command | Result |
 | --- | --- | --- |
-| Engine, API, reporting, workflow | `python3 -m unittest discover -s tests -t .` | **286 tests, all passing** (test_api 37, test_audit 4, test_cfg 15, test_dataflow 26, test_lexer 19, test_mutation_check 7, test_parser 27, test_reporting 24, test_rules 29, test_semantics 18, test_slicing 20, test_taint 40, test_workflow 20) |
-| Interface | `cd frontend && npm test` | **30 tests, all passing** |
+| Engine, API, reporting, workflow | `python3 -m unittest discover -s tests -t .` | **310 tests, all passing** (test_api 41, test_audit 4, test_cfg 15, test_clr_theory 9, test_core_battery 7, test_dataflow 26, test_lexer 19, test_mutation_check 7, test_parser 27, test_reporting 24, test_rules 29, test_semantics 20, test_slicing 22, test_taint 40, test_workflow 20) |
+| Interface | `cd frontend && npm test` | **39 tests, all passing** |
 | Labelled corpus | `scripts/evaluate.sh` | **33 cases, 33 passed**: TP 20 / FP 0 / FN 0, file-level TN 9/9, precision = recall = F1 = 1.0, 1.14 s total |
 | Independent audit | `python3 scripts/audit.py` | **69 checks, all passing** |
 | Mutation check | `python3 scripts/mutation_check.py` | **18/18 deliberate defects caught** |
@@ -237,8 +237,8 @@ Stated plainly, because a report that lists only successes is not a report:
 ## 11. How to reproduce every claim above
 
 ```bash
-python3 -m unittest discover -s tests -t .   # 286 tests
-scripts/tests.sh                             # the above plus 30 interface tests
+python3 -m unittest discover -s tests -t .   # 310 tests
+scripts/tests.sh                             # the above plus 39 interface tests
 scripts/evaluate.sh                          # 33 cases, JSON evidence in var/
 python3 scripts/audit.py -v                  # 69 independent checks, values printed
 python3 scripts/mutation_check.py            # 18 mutations, all must be caught

@@ -73,15 +73,30 @@ async function refresh(route = currentRoute()) {
         onFilter: (patch) => { update({ filters: { ...state.filters, ...patch } }); refresh('findings'); },
         onSort: (sortKey) => { update({ sort: sortKey }); refresh('findings'); },
         onSelect: selectFinding,
-        onShowSlice: (target, finding) => {
+        onShowSlice: async (target, finding) => {
+          // Fetch the finding-specific artefact first, then navigate to a page
+          // that already has something to show.  Fetching after navigating
+          // used to leave the page behind: the fetch ran without a second
+          // paint, so the page kept showing whatever it showed before — a
+          // stale graph, or a spinner that never stopped.
           if (target === 'graph') {
-            update({ graph: { ...state.graph, mode: 'dependency' }, selectedFinding: finding.id });
+            update({ graph: { ...state.graph, mode: 'dependency', data: null, loadError: null }, selectedFinding: finding.id });
+            try {
+              await loadStatementSubgraph(finding);
+            } catch (error) {
+              update({ graph: { ...state.graph, loadError: error.message } });
+            }
             window.location.hash = '#/graph';
-            loadStatementSubgraph(finding);
+            refresh('graph');
           } else {
-            update({ slicing: { ...state.slicing, source: 'finding' } });
+            update({ slicing: { ...state.slicing, source: 'finding', data: null, error: null } });
+            try {
+              await loadSliceForFinding(finding.id);
+            } catch (error) {
+              update({ slicing: { ...state.slicing, error: error.message } });
+            }
             window.location.hash = '#/slicing';
-            loadSliceForFinding(finding.id);
+            refresh('slicing');
           }
         },
         onSelectStatement: selectStatement,
@@ -91,43 +106,59 @@ async function refresh(route = currentRoute()) {
       const options = {
         state,
         onSelectNode: (node) => { if (node.sid >= 0) selectStatement(node.sid); },
-        onMode: async (mode) => { update({ graph: { ...state.graph, mode } }); await loadGraphData(); refresh('graph'); },
+        onMode: async (mode) => {
+          update({ graph: { ...state.graph, mode, data: null, loadError: null, focus: null } });
+          await reloadGraphData();
+          refresh('graph');
+        },
         onKinds: async (kind, checked) => {
           const kinds = checked
             ? [...new Set([...state.graph.kinds, kind])]
             : state.graph.kinds.filter((entry) => entry !== kind);
-          update({ graph: { ...state.graph, kinds } });
-          await loadGraphData();
+          update({ graph: { ...state.graph, kinds, loadError: null } });
+          await reloadGraphData();
+          refresh('graph');
+        },
+        onCfgFunction: async (fn) => {
+          update({ graph: { ...state.graph, cfgFunction: fn, loadError: null } });
+          await reloadGraphData();
           refresh('graph');
         },
       };
       renderGraphView(view, options);
       // Reaching this page after a run must show the graph, not a placeholder:
-      // fetch it the first time the page is opened and paint again.
-      if (state.run && state.graph.mode !== 'cfg' && !state.graph.data) {
-        try {
-          await loadGraphData();
-        } catch (error) {
-          showError('Could not load the program graph.', error.message);
-        }
+      // fetch it the first time the page is opened and paint again.  A failed
+      // fetch is kept on the state (not only in the banner) so the canvas can
+      // explain itself instead of spinning forever.
+      const graphFunctions = (state.run.summary && state.run.summary.functions) || [];
+      const needsFetch = state.run && !state.graph.data && !state.graph.loadError
+        && (state.graph.mode === 'cfg'
+          ? graphFunctions.length > 0
+          : (state.run.summary && state.run.summary.dependencies_built !== false));
+      if (needsFetch) {
+        await reloadGraphData();
         renderGraphView(view, options);
       }
     } else if (route === 'dataflow') {
       const view = document.getElementById('view-dataflow');
       const options = {
         state,
-        onFunction: async (fn) => { update({ dataflow: { ...state.dataflow, function: fn } }); await loadDataflowData(); refresh('dataflow'); },
-        onAnalysis: async (analysis) => { update({ dataflow: { ...state.dataflow, analysis } }); await loadDataflowData(); refresh('dataflow'); },
+        onFunction: async (fn) => {
+          update({ dataflow: { ...state.dataflow, function: fn, data: null, error: null } });
+          await reloadDataflowData();
+          refresh('dataflow');
+        },
+        onAnalysis: async (analysis) => {
+          update({ dataflow: { ...state.dataflow, analysis, data: null, error: null } });
+          await reloadDataflowData();
+          refresh('dataflow');
+        },
         onSelectStatement: selectStatement,
       };
       renderDataflow(view, options);
       const hasFunctions = Boolean(state.run && state.run.summary && (state.run.summary.functions || []).length);
-      if (state.run && hasFunctions && !state.dataflow.data) {
-        try {
-          await loadDataflowData();
-        } catch (error) {
-          showError('Could not load the data-flow results.', error.message);
-        }
+      if (state.run && hasFunctions && !state.dataflow.data && !state.dataflow.error) {
+        await reloadDataflowData();
         renderDataflow(view, options);
       }
     } else if (route === 'slicing') {
@@ -136,27 +167,31 @@ async function refresh(route = currentRoute()) {
       const options = {
         state,
         onCriterion: async (sid) => {
-          update({ slicing: { ...state.slicing, sid, source: 'statement', data: null } });
-          await loadSliceData(sid);
+          update({ slicing: { ...state.slicing, sid, source: 'statement', data: null, error: null } });
+          await reloadSliceData(sid);
           refresh('slicing');
         },
         onDirection: async (direction) => {
-          update({ slicing: { ...state.slicing, direction, data: null } });
-          await loadSliceData(state.slicing.sid);
+          update({ slicing: { ...state.slicing, direction, data: null, error: null } });
+          await reloadSliceData(state.slicing.sid);
           refresh('slicing');
         },
         onSelectStatement: selectStatement,
       };
       renderSlicing(view, options);
-      if (state.run && !state.slicing.data) {
+      const slicingAvailable = !state.run || !state.run.summary || state.run.summary.slicing_available !== false;
+      if (state.run && state.slicing.source === 'finding' && !state.slicing.data && !state.slicing.error) {
+        // A finding slice is loaded by the Findings page action; landing here
+        // without one (a stale state) falls back to a statement slice rather
+        // than spinning forever.
+        update({ slicing: { ...state.slicing, source: 'statement' } });
+      }
+      if (state.run && slicingAvailable && !state.slicing.data && !state.slicing.error
+          && state.slicing.source !== 'finding') {
         const criterion = defaultCriterion(state);
         if (criterion !== null) {
           update({ slicing: { ...state.slicing, sid: criterion, source: 'statement' } });
-          try {
-            await loadSliceData(criterion);
-          } catch (error) {
-            showError('Could not compute the slice.', error.message);
-          }
+          await reloadSliceData(criterion);
           renderSlicing(view, options);
         }
       }
@@ -192,10 +227,16 @@ function defaultCriterion(state) {
   return sids.length ? sids[sids.length - 1] : null;
 }
 
-async function loadGraphData() {
-  if (!state.run || state.graph.mode === 'cfg') return;
-  const graph = await loadGraph(state, api);
-  update({ graph: { ...state.graph, data: graph } });
+async function reloadGraphData() {
+  if (!state.run) return;
+  try {
+    const graph = await loadGraph(state, api);
+    update({ graph: { ...state.graph, data: graph, loadError: null, focus: null } });
+  } catch (error) {
+    // Kept on the state so the canvas explains the failure in place; a banner
+    // alone would leave a spinner spinning underneath it.
+    update({ graph: { ...state.graph, data: null, loadError: error.message } });
+  }
 }
 
 async function loadStatementSubgraph(finding) {
@@ -203,23 +244,33 @@ async function loadStatementSubgraph(finding) {
   const statementNodes = new Set((finding.statement_ids || []).map((sid) => `s${sid}`));
   const nodes = graph.nodes.filter((node) => statementNodes.has(node.id) || node.kind === 'function');
   const kept = new Set(nodes.map((node) => node.id));
-  const edges = graph.edges.filter((edge) => kept.has(edge.from) || kept.has(edge.to));
-  update({ graph: { ...state.graph, data: { ...graph, nodes, edges }, focus: finding.id } });
+  // An edge is only drawable when both ends survived the filter; keeping
+  // half-edges would inflate the edge count with lines the renderer skips.
+  const edges = graph.edges.filter((edge) => kept.has(edge.from) && kept.has(edge.to));
+  update({ graph: { ...state.graph, data: { ...graph, nodes, edges }, loadError: null, focus: finding.id } });
 }
 
-async function loadDataflowData() {
-  const data = await loadDataflow(state);
-  update({ dataflow: { ...state.dataflow, data } });
+async function reloadDataflowData() {
+  try {
+    const data = await loadDataflow(state);
+    update({ dataflow: { ...state.dataflow, data, error: null } });
+  } catch (error) {
+    update({ dataflow: { ...state.dataflow, data: null, error: error.message } });
+  }
 }
 
-async function loadSliceData(sid) {
-  const slice = await loadSlice(state, sid);
-  update({ slicing: { ...state.slicing, data: slice } });
+async function reloadSliceData(sid) {
+  try {
+    const slice = await loadSlice(state, sid);
+    update({ slicing: { ...state.slicing, data: slice, error: null } });
+  } catch (error) {
+    update({ slicing: { ...state.slicing, data: null, error: error.message } });
+  }
 }
 
 async function loadSliceForFinding(findingId) {
   const slice = await loadFindingSlice(state, findingId);
-  update({ slicing: { ...state.slicing, data: slice } });
+  update({ slicing: { ...state.slicing, source: 'finding', data: slice } });
 }
 
 async function selectFinding(findingId) {
@@ -254,6 +305,8 @@ async function compareRuns() {
     showError('Enter both run ids to compare two runs.');
     return;
   }
+  const button = document.getElementById('compare-button');
+  if (button) button.disabled = true;
   try {
     const comparison = await api.compare(before, after);
     update({ comparison, compareBefore: before, compareAfter: after });
@@ -261,6 +314,8 @@ async function compareRuns() {
     refresh('reports');
   } catch (error) {
     showError(`Comparison failed: ${error.message}`);
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
@@ -288,7 +343,9 @@ function wireInputs() {
       runDependencies: view.querySelector('#run-dependencies').checked,
     });
     if (run) {
-      update({ statementsById: statementIndex(run), selectedFinding: null, selectedFindingDetail: null });
+      // runAnalysis already stored the run and dropped the previous run's
+      // artefacts; only the statement index (derived here) is still missing.
+      update({ statementsById: statementIndex(run) });
       refresh('analyze');
     }
   });

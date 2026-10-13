@@ -34,6 +34,12 @@ SCHEMAS: Dict[str, dict] = {
                 "description": "optional rule file text; validated before use",
             },
             "use_builtin_rules": {"type": "boolean", "default": True},
+            "run_dependencies": {
+                "type": "boolean",
+                "default": True,
+                "description": "build the program dependency graph and slices; "
+                               "when false, /graph and /slice answer 409",
+            },
             "parser_mode": {"type": "string", "enum": ["lalr", "slr", "canonical"], "default": "lalr"},
         },
         "required": ["source"],

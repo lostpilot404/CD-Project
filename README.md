@@ -108,8 +108,8 @@ language), so the interface cannot claim more than the engine implements.
 
 | Suite | Command | Result on this checkout |
 | --- | --- | --- |
-| Engine, API, reporting, workflow | `python3 -m unittest discover -s tests -t .` | 286 tests, all passing |
-| Interface | `cd frontend && npm test` | 30 tests, all passing (real engine over HTTP, stub DOM) |
+| Engine, API, reporting, workflow | `python3 -m unittest discover -s tests -t .` | 310 tests, all passing |
+| Interface | `cd frontend && npm test` | 39 tests, all passing (real engine over HTTP, stub DOM) |
 | Labelled corpus | `scripts/evaluate.sh` | 33 files, 20 expected findings, TP 20 / FP 0 / FN 0, file-level TN 9/9, precision = recall = F1 = 1.0, ≈1.2 s total |
 | Independent audit | `python3 scripts/audit.py` | 69 checks covering grammar, hand-computed data flow, graph edges, slices, rules, the HTTP workflow, malformed input, the interface contract, document accuracy, the claims the documents make about the code, and drift between the module table and the tree |
 | Mutation check | `python3 scripts/mutation_check.py` | 18 deliberate defects (parser, semantics, CFG, data flow, taint, slicing, rules, reporting); the suite has to catch every one, and does (18/18) |
