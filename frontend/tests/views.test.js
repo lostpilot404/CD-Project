@@ -794,3 +794,33 @@ test('the graph view draws one control-flow graph per function', async () => {
     20000,
   );
 });
+
+test('a slicing page left without its finding slice falls back to a statement slice', async () => {
+  // A finding slice is loaded by the Findings page action; if the page is ever
+  // reached expecting one that never arrived, it must fall back to a statement
+  // slice rather than spin forever.
+  const { state, update } = await import('../js/state.js');
+  await go('analyze');
+  page.document.getElementById('source-input').value = PROGRAM;
+  page.document.getElementById('filename-input').value = 'fallback.ctc';
+  page.document.getElementById('use-builtin').checked = true;
+  page.document.getElementById('run-dependencies').checked = true;
+  page.document.getElementById('analyze-button').click();
+  await waitFor(
+    () => {
+      const text = page.document.getElementById('analyze-status').textContent;
+      return text.includes('fallback.ctc') && text.includes('run ');
+    },
+    'the analysis to finish',
+    30000,
+  );
+  assert.equal(state.run.summary.slicing_available, true);
+
+  update({ slicing: { ...state.slicing, source: 'finding', data: null, error: null } });
+  await go('slicing');
+  const body = page.document.getElementById('slicing-body');
+  await waitFor(() => body.textContent.includes('slice ('), 'the fallback statement slice', 20000);
+  assert.equal(state.slicing.source, 'statement');
+  assert.ok(state.slicing.data, 'a statement slice was computed instead of spinning forever');
+  assert.match(body.textContent, /Statements in the slice/);
+});

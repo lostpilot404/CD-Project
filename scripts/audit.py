@@ -663,7 +663,8 @@ def check_claims() -> None:
 
     # -- the matching rule: line numbers are not part of the match ---------
     harness_path = os.path.join(ROOT, "evaluation", "run_evaluation.py")
-    harness_source = open(harness_path, encoding="utf-8").read()
+    with open(harness_path, encoding="utf-8") as handle:
+        harness_source = handle.read()
     matcher_body = harness_source.split("def finding_matches", 1)[1].split("\ndef ", 1)[0]
     check(
         "finding_matches does not consult the line number it records",
