@@ -1,0 +1,140 @@
+/**
+ * Analyze Code: submit source to the engine and show what came back.
+ *
+ * The editor's content is sent as JSON to /api/analyze. It is never executed,
+ * never written to disk by the API and never placed into the page as markup.
+ */
+import { el, render } from '../lib/dom.js';
+import { api, ApiError } from '../api.js';
+import { renderSource } from '../source.js';
+import { update } from '../state.js';
+
+const DIAGNOSTIC_ORDER = { error: 0, warning: 1, info: 2 };
+
+export function diagnosticTable(diagnostics) {
+  if (!diagnostics || !diagnostics.length) {
+    return el('p', { class: 'empty-state', text: 'No diagnostics: the file parsed and passed the semantic checks that apply to this subset.' });
+  }
+  const rows = [...diagnostics]
+    .sort((a, b) => (DIAGNOSTIC_ORDER[a.severity] ?? 9) - (DIAGNOSTIC_ORDER[b.severity] ?? 9) || a.line - b.line || a.col - b.col)
+    .map((diagnostic) =>
+      el('tr', {}, [
+        el('td', {}, el('span', { class: `badge badge--${diagnostic.severity}`, text: diagnostic.severity })),
+        el('td', { class: 'mono', text: diagnostic.code }),
+        el('td', { class: 'mono', text: `${diagnostic.line}:${diagnostic.col}` }),
+        el('td', { text: diagnostic.phase }),
+        el('td', {}, [
+          diagnostic.message,
+          diagnostic.detail ? el('div', { class: 'hint', text: diagnostic.detail }) : null,
+          diagnostic.unsupported ? el('div', { class: 'hint', text: 'Unsupported construct: the enclosing statement was skipped, not guessed at.' }) : null,
+        ]),
+      ]),
+    );
+  return el('table', { class: 'data' }, [
+    el('caption', { class: 'hint', text: 'Diagnostics reported for this file' }),
+    el('thead', {}, el('tr', {}, ['severity', 'code', 'line:col', 'phase', 'message'].map((header) => el('th', { text: header })))),
+    el('tbody', {}, rows),
+  ]);
+}
+
+export function renderAnalyze(container, { state, onRun, onStatus }) {
+  const status = container.querySelector('#analyze-status');
+  const summary = container.querySelector('#analyze-summary');
+  const diagnostics = container.querySelector('#analyze-diagnostics');
+  const source = state.source || '';
+
+  const editor = container.querySelector('#source-input');
+  if (editor.value !== source) editor.value = source;
+
+  const stored = container.querySelector('#filename-input');
+  if (state.run && !stored.dataset.touched) stored.value = state.run.filename;
+
+  if (!state.run) {
+    render(status, []);
+    render(summary, []);
+    render(diagnostics, []);
+    return container;
+  }
+
+  const run = state.run;
+  const metrics = run.metrics || {};
+  render(status, el('span', { text: `Analysed ${run.filename} in ${run.total_analysis_seconds} s (run ${run.run_id}).` }));
+  render(summary, [
+    el('h2', { text: 'Summary' }),
+    el('dl', { class: 'kv' }, [
+      el('dt', { text: 'findings' }), el('dd', { text: String(run.summary.findings) }),
+      el('dt', { text: 'by severity' }), el('dd', { text: Object.entries(run.summary.by_severity).map(([k, v]) => `${k}: ${v}`).join(', ') || 'none' }),
+      el('dt', { text: 'by category' }), el('dd', { text: Object.entries(run.summary.by_category).map(([k, v]) => `${k}: ${v}`).join(', ') || 'none' }),
+      el('dt', { text: 'statements / blocks' }), el('dd', { text: `${metrics.statements ?? '—'} / ${metrics.basic_blocks ?? '—'}` }),
+      el('dt', { text: 'dependency edges' }), el('dd', { text: String(metrics.dependency_edges ?? '—') }),
+      el('dt', { text: 'limits reached' }), el('dd', { text: (run.limits_hit || []).join('; ') || 'none' }),
+    ]),
+    el('p', { class: 'hint', text: 'Open Findings, Program Graph, Data-Flow Analysis or Program Slicing to inspect the result of this run.' }),
+  ]);
+
+  render(diagnostics, [
+    el('h2', { text: 'Diagnostics' }),
+    diagnosticTable(run.diagnostics),
+    run.summary.analysis_complete === false
+      ? el('p', { class: 'alert alert--warn', text: `This analysis is partial: ${(run.summary.partial_reasons || []).join('; ')}` })
+      : null,
+  ]);
+  return container;
+}
+
+/** Example picker: a modal dialog listing the bundled corpus. */
+export async function openExamplePicker({ onPick }) {
+  const root = document.getElementById('modal-root');
+  const list = el('div', {}, el('p', { class: 'spinner-wrapper' }, [el('span', { class: 'spinner' }), ' loading examples…']));
+  const close = () => render(root, []);
+  const modal = el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Load a bundled example' }, [
+    el('div', { class: 'row row--between' }, [
+      el('h2', { text: 'Bundled examples' }),
+      el('button', { type: 'button', class: 'button button--small', text: 'Close', on: { click: close } }),
+    ]),
+    list,
+  ]);
+  render(root, el('div', { class: 'modal-backdrop', on: { click: (event) => { if (event.target.classList.contains('modal-backdrop')) close(); } } }, modal));
+  try {
+    const payload = await api.examples();
+    const categories = [...new Set(payload.examples.map((entry) => entry.category))].sort();
+    const body = el('div');
+    for (const category of categories) {
+      body.appendChild(el('p', { class: 'modal__category', text: category }));
+      const items = payload.examples.filter((entry) => entry.category === category);
+      body.appendChild(el('ul', { class: 'modal__list' }, items.map((entry) =>
+        el('li', {}, el('button', {
+          type: 'button',
+          on: { click: async () => { close(); await onPick(entry); } },
+          text: entry.name,
+        })),
+      )));
+    }
+    render(list, body);
+  } catch (error) {
+    render(list, el('p', { class: 'alert alert--error', text: `Could not load the example list: ${error.message}` }));
+  }
+}
+
+/** Run the analysis for the current editor contents. */
+export async function runAnalysis(container, { filename, source, parserMode, useBuiltin, customRules, runDependencies }) {
+  const button = container.querySelector('#analyze-button');
+  const status = container.querySelector('#analyze-status');
+  button.disabled = true;
+  render(status, [el('span', { class: 'spinner' }), ' analysing…']);
+  try {
+    const payload = { source, filename, parser_mode: parserMode };
+    if (!useBuiltin) payload.use_builtin_rules = false;
+    if (customRules && customRules.trim()) payload.rules = customRules;
+    const run = await api.analyze(payload);
+    update({ run, source });
+    render(status, el('span', { text: `Analysed ${run.filename} in ${run.total_analysis_seconds} s.` }));
+    return run;
+  } catch (error) {
+    const detail = error instanceof ApiError && error.detail ? ` (${error.detail})` : '';
+    render(status, el('span', { class: 'alert alert--error', text: `${error.message}${detail}` }));
+    return null;
+  } finally {
+    button.disabled = false;
+  }
+}

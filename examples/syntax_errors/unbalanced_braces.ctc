@@ -1,0 +1,5 @@
+// expect: a syntax error, and the parser reports where the construct is incomplete
+int main() {
+  string name = input();
+  system(name);
+  return 0;

@@ -1,0 +1,10 @@
+{
+  "name": "codetrace-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CodeTrace interface: plain ES modules, no build step, no dependencies. The tests use Node's built-in test runner.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\""
+  }
+}

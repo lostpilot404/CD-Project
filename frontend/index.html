@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CodeTrace — compiler-driven dependency and vulnerability analysis</title>
+  <meta name="description" content="Static analysis of a C subset: lexer, canonical LR(1) parser, semantic analysis, control-flow graphs, data-flow analysis, taint propagation, program dependency graphs and slicing.">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="topbar">
+    <div class="topbar__brand">
+      <span class="topbar__logo" aria-hidden="true">CT</span>
+      <span>
+        <strong>CodeTrace</strong>
+        <span class="topbar__tagline">compiler-driven dependency and vulnerability analysis</span>
+      </span>
+    </div>
+    <div class="topbar__status" id="engine-status" role="status" aria-live="polite">
+      <span class="badge badge--muted">connecting…</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="nav" aria-label="Main sections">
+      <ul class="nav__list" id="nav-list">
+        <li><a href="#/overview" data-route="overview">Overview</a></li>
+        <li><a href="#/analyze" data-route="analyze">Analyze Code</a></li>
+        <li><a href="#/findings" data-route="findings">Findings</a></li>
+        <li><a href="#/graph" data-route="graph">Program Graph</a></li>
+        <li><a href="#/dataflow" data-route="dataflow">Data-Flow Analysis</a></li>
+        <li><a href="#/slicing" data-route="slicing">Program Slicing</a></li>
+        <li><a href="#/rules" data-route="rules">Rule Editor</a></li>
+        <li><a href="#/reports" data-route="reports">Reports</a></li>
+        <li><a href="#/documentation" data-route="documentation">Documentation</a></li>
+      </ul>
+      <div class="nav__footer">
+        <button type="button" class="button button--ghost button--small" id="theme-toggle" aria-pressed="false">
+          High contrast: off
+        </button>
+        <p class="nav__note">
+          The analysed program is never executed. Findings are static-analysis results,
+          not proof of exploitability.
+        </p>
+      </div>
+    </nav>
+
+    <main id="main" class="main" tabindex="-1">
+      <div id="global-error" class="alert alert--error" hidden role="alert"></div>
+
+      <section class="view" id="view-overview" data-view="overview" aria-labelledby="h-overview" hidden>
+        <h1 id="h-overview">Overview</h1>
+        <p class="lede">
+          CodeTrace parses a C-like language with its own canonical LR(1) parser generator and
+          analyses the result: control-flow graphs, reaching definitions, liveness, definite
+          assignment, taint propagation, a typed program dependency graph and program slices.
+        </p>
+        <div class="grid grid--stats" id="overview-stats"></div>
+        <div class="panel" id="overview-run"></div>
+        <div class="panel" id="overview-pipeline"></div>
+      </section>
+
+      <section class="view" id="view-analyze" data-view="analyze" aria-labelledby="h-analyze" hidden>
+        <h1 id="h-analyze">Analyze Code</h1>
+        <div class="analyze">
+          <div class="analyze__editor">
+            <label for="source-input" class="label">Source file (CT-C subset)</label>
+            <textarea id="source-input" class="editor" spellcheck="false" rows="22"
+                      aria-describedby="source-help"></textarea>
+            <p id="source-help" class="hint">
+              The text is analysed as data. Nothing in it is executed, imported or written to disk.
+            </p>
+            <div class="row row--wrap">
+              <button type="button" class="button button--primary" id="analyze-button">Run analysis</button>
+              <button type="button" class="button" id="load-example-button">Load example…</button>
+              <button type="button" class="button button--ghost" id="clear-button">Clear</button>
+            </div>
+          </div>
+          <div class="analyze__options">
+            <fieldset class="fieldset">
+              <legend>Options</legend>
+              <label class="field">
+                <span>File name (for diagnostics and reports)</span>
+                <input type="text" id="filename-input" value="example.ctc" maxlength="200">
+              </label>
+              <label class="field">
+                <span>Parser tables</span>
+                <select id="parser-mode">
+                  <option value="lalr">LALR(1) — default</option>
+                  <option value="slr">SLR(1) — teaching mode</option>
+                  <option value="canonical">canonical LR(1) — may reject LALR-valid input</option>
+                </select>
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" id="use-builtin" checked>
+                <span>Use the built-in security rules</span>
+              </label>
+              <label class="field">
+                <span>Custom rules (rule language, optional)</span>
+                <textarea id="rules-input" class="editor editor--small" rows="6" spellcheck="false"
+                          placeholder="version 1&#10;sink my_sink { function system arguments 0 context command }"></textarea>
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" id="run-dependencies" checked>
+                <span>Build the program dependency graph and slices</span>
+              </label>
+            </fieldset>
+            <div id="analyze-status" class="status" role="status" aria-live="polite"></div>
+            <div id="analyze-summary" class="panel panel--tight"></div>
+          </div>
+        </div>
+        <div class="panel" id="analyze-diagnostics"></div>
+      </section>
+
+      <section class="view" id="view-findings" data-view="findings" aria-labelledby="h-findings" hidden>
+        <h1 id="h-findings">Findings</h1>
+        <div class="panel panel--toolbar" id="findings-toolbar"></div>
+        <div class="findings-layout">
+          <div class="findings-layout__list" id="findings-list"></div>
+          <div class="findings-layout__detail" id="finding-detail"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-graph" data-view="graph" aria-labelledby="h-graph" hidden>
+        <h1 id="h-graph">Program Graph</h1>
+        <div class="panel panel--toolbar" id="graph-toolbar"></div>
+        <div class="graph-layout">
+          <div class="graph-layout__canvas" id="graph-canvas"></div>
+          <aside class="graph-layout__side" id="graph-side"></aside>
+        </div>
+      </section>
+
+      <section class="view" id="view-dataflow" data-view="dataflow" aria-labelledby="h-dataflow" hidden>
+        <h1 id="h-dataflow">Data-Flow Analysis</h1>
+        <div class="panel panel--toolbar" id="dataflow-toolbar"></div>
+        <div class="panel" id="dataflow-body"></div>
+      </section>
+
+      <section class="view" id="view-slicing" data-view="slicing" aria-labelledby="h-slicing" hidden>
+        <h1 id="h-slicing">Program Slicing</h1>
+        <div class="panel panel--toolbar" id="slicing-toolbar"></div>
+        <div class="panel" id="slicing-body"></div>
+      </section>
+
+      <section class="view" id="view-rules" data-view="rules" aria-labelledby="h-rules" hidden>
+        <h1 id="h-rules">Rule Editor</h1>
+        <p class="lede">
+          Security rules are written in a small declarative language that CodeTrace parses with its
+          own LR(1) machinery and validates before use. Rules are untrusted input: they can declare
+          functions, contexts and severities, and they can never execute code.
+        </p>
+        <div class="rules-layout">
+          <div>
+            <label class="label" for="rule-editor">Rule file</label>
+            <textarea id="rule-editor" class="editor" rows="20" spellcheck="false"></textarea>
+            <div class="row">
+              <button type="button" class="button button--primary" id="validate-rules-button">Validate</button>
+              <button type="button" class="button" id="load-rule-example-button">Load example rule file</button>
+              <button type="button" class="button button--ghost" id="analyze-with-rules-button">Analyse a file with these rules</button>
+            </div>
+            <div id="rules-status" class="status" role="status" aria-live="polite"></div>
+            <div id="rules-diagnostics" class="panel panel--tight"></div>
+          </div>
+          <div>
+            <h2>Active rules</h2>
+            <div id="rules-active" class="panel panel--tight"></div>
+            <h2>Rule language grammar</h2>
+            <div id="rules-grammar" class="panel panel--tight"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-reports" data-view="reports" aria-labelledby="h-reports" hidden>
+        <h1 id="h-reports">Reports</h1>
+        <div class="panel" id="reports-body"></div>
+      </section>
+
+      <section class="view" id="view-documentation" data-view="documentation" aria-labelledby="h-docs" hidden>
+        <h1 id="h-docs">Documentation</h1>
+        <div class="panel" id="docs-body"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="modal-root"></div>
+
+  <script type="module" src="js/app.js"></script>
+  <noscript>
+    <p class="alert alert--error">
+      CodeTrace's interface needs JavaScript. The analysis engine and the HTTP API work without it;
+      see docs/USER_GUIDE.md for command-line usage.
+    </p>
+  </noscript>
+</body>
+</html>

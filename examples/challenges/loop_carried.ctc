@@ -1,0 +1,11 @@
+// expect: 1 finding: the tainted value flows through a loop-carried assignment
+int main() {
+  string value = input();
+  int i = 0;
+  while (i < 3) {
+    value = value + "x";
+    i = i + 1;
+  }
+  system(value);
+  return 0;
+}

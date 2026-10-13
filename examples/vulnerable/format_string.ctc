@@ -1,0 +1,6 @@
+// expect: 1 finding, rule format_string, MEDIUM
+int main() {
+  string format = readenv("GREETING");
+  printf(format);
+  return 0;
+}

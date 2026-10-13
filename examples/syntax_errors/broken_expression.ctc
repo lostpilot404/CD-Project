@@ -1,0 +1,5 @@
+// expect: a syntax error inside the expression, reported at the failing token
+int main() {
+  int total = 1 + * 2;
+  return total;
+}

@@ -1,0 +1,15 @@
+// expect: 1 finding, rule command_execution: the taint crosses two call boundaries
+int run_command(string command) {
+  return system(command);
+}
+
+string wrap(string value) {
+  return value;
+}
+
+int main() {
+  string name = input();
+  string command = wrap(name);
+  run_command(command);
+  return 0;
+}

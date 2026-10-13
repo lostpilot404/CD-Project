@@ -1,0 +1,8 @@
+// expect: no findings: to_int destroys the text representation of the value
+int main() {
+  string name = input();
+  int number = to_int(name);
+  string text = to_string(number);
+  system(text);
+  return 0;
+}

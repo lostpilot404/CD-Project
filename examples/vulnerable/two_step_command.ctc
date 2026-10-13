@@ -1,0 +1,8 @@
+// expect: 1 finding, rule command_execution, reached through three assignments
+int main() {
+  string step_one = input();
+  string step_two = step_one;
+  string step_three = step_two;
+  system(step_three);
+  return 0;
+}

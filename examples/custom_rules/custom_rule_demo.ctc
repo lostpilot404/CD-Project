@@ -1,0 +1,9 @@
+// Used with examples/custom_rules/strict_rules.ctrule: the custom sink is
+// reported only when the custom rule file is loaded.
+int main() {
+  string body = http_body();
+  audit_write(body);
+  string escaped = audit_escape(body);
+  audit_write(escaped);
+  return 0;
+}

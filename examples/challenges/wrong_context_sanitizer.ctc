@@ -1,0 +1,8 @@
+// expect: 2 findings: sql_escape does not neutralise command context, and the raw value still reaches sql_exec
+int main() {
+  string name = input();
+  string quoted = sql_escape(name);
+  system(quoted);
+  sql_exec(name);
+  return 0;
+}

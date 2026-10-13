@@ -1,0 +1,36 @@
+# A small rule file used by the rule-language tests and by the UI example
+# picker.  It adds one source, one sink and one flow for a fictional API.
+version 1
+
+source request_body {
+    description "the body of an incoming HTTP request"
+    function http_body
+    returns
+    contexts command, sql, path
+}
+
+sink audit_log {
+    description "writes its argument into an audit log file"
+    function audit_write
+    arguments 0
+    context path
+    category "arbitrary-file-write"
+    severity MEDIUM
+}
+
+sanitizer audit_escape {
+    description "escapes path separators before logging"
+    function audit_escape
+    argument 0
+    context path
+}
+
+flow audit_injection {
+    description "an untrusted request body reaches the audit log writer"
+    severity MEDIUM
+    category "arbitrary-file-write"
+    sources request_body
+    sinks audit_log
+    sanitizers audit_escape
+    enabled true
+}

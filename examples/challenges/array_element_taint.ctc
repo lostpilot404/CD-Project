@@ -1,0 +1,8 @@
+// expect: 1 finding: taint on an array element is attributed to the whole array
+int main() {
+  string parts[4];
+  parts[0] = input();
+  parts[1] = "ls";
+  system(parts[0]);
+  return 0;
+}

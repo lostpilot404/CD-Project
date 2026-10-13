@@ -1,0 +1,8 @@
+// expect: no findings: the value is used only behind a declared validator
+int main() {
+  string name = input();
+  if (is_safe_command(name)) {
+    system(name);
+  }
+  return 0;
+}

@@ -1,0 +1,12 @@
+// expect: 1 finding, rule command_execution, HIGH, category command-injection
+// Untrusted standard input is concatenated into a shell command.
+string build_command(string user_input) {
+  return "ls " + user_input;
+}
+
+int main() {
+  string name = input();
+  string command = build_command(name);
+  system(command);
+  return 0;
+}

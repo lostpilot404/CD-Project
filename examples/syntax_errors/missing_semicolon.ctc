@@ -1,0 +1,6 @@
+// expect: exactly one SYN001 error with a line:column and an expected-token list
+int main() {
+  string name = input()
+  system(name);
+  return 0;
+}

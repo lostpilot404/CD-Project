@@ -1,0 +1,6 @@
+// expect: syntax/unsupported diagnostics: pointer types are outside the analysed subset
+int main() {
+  int *pointer = 0;
+  system("ls");
+  return 0;
+}

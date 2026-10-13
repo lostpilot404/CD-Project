@@ -1,0 +1,7 @@
+// expect: no findings: the source value is overwritten before the sink
+int main() {
+  string value = input();
+  value = "whoami";
+  system(value);
+  return 0;
+}

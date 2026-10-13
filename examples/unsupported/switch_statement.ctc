@@ -1,0 +1,9 @@
+// expect: syntax/unsupported diagnostics; the file is not analysed as if switch were safe
+int main() {
+  int n = input_int();
+  switch (n) {
+    case 1:
+      system("one");
+  }
+  return 0;
+}

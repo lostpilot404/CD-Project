@@ -1,0 +1,7 @@
+// expect: no findings: sql_escape neutralises SQL-context taint
+int main() {
+  string name = input();
+  string query = sql_escape(name);
+  sql_exec(query);
+  return 0;
+}

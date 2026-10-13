@@ -1,0 +1,209 @@
+# CodeTrace built-in security rules.
+#
+# This file is written in the CodeTrace rule language and is parsed by the
+# project's own LR(1) parser generator at start-up.  It is validated before it
+# is used: an invalid built-in rule file makes CodeTrace refuse to start rather
+# than analyse with a partially loaded rule set.
+
+version 1
+
+# ----------------------------------------------------------------- sources
+source stdin {
+    description "one line read from standard input; attacker controlled in most deployments"
+    function input
+    returns
+    contexts command, sql, path, html, numeric, format
+}
+
+source stdin_int {
+    description "one integer read from standard input; still attacker controlled input"
+    function input_int
+    returns
+    contexts command, sql, path, html, numeric, format
+}
+
+source environment {
+    description "an environment variable, which may be set by the caller of the program"
+    function readenv
+    returns
+    contexts command, sql, path, html, numeric, format
+}
+
+source command_line {
+    description "a command line argument supplied when the program was started"
+    function argv
+    returns
+    contexts command, sql, path, html, numeric, format
+}
+
+source file_content {
+    description "data read from a file; untrusted when the file is not part of the program"
+    function readfile
+    returns
+    contexts command, sql, path, html, numeric, format
+}
+
+# -------------------------------------------------------------------- sinks
+sink command_system {
+    description "executes its argument through the system command interpreter"
+    function system
+    arguments 0
+    context command
+    category "command-injection"
+    severity HIGH
+}
+
+sink command_exec {
+    description "replaces the current process image with the program named by its argument"
+    function exec
+    arguments 0
+    context command
+    category "command-injection"
+    severity HIGH
+}
+
+sink command_popen {
+    description "runs its argument through the shell and returns a stream"
+    function popen
+    arguments 0
+    context command
+    category "command-injection"
+    severity HIGH
+}
+
+sink path_fopen {
+    description "opens a filesystem path; an attacker controlled path allows traversal"
+    function fopen
+    arguments 0
+    context path
+    category "path-traversal"
+    severity HIGH
+}
+
+sink path_readfile {
+    description "reads a filesystem path; an attacker controlled path allows traversal"
+    function readfile
+    arguments 0
+    context path
+    category "path-traversal"
+    severity HIGH
+}
+
+sink path_writefile {
+    description "writes to a filesystem path; an attacker controlled path allows arbitrary writes"
+    function writefile
+    arguments 0
+    context path
+    category "arbitrary-file-write"
+    severity CRITICAL
+}
+
+sink sql_exec {
+    description "executes its argument as a database query"
+    function sql_exec
+    arguments 0
+    context sql
+    category "sql-injection"
+    severity CRITICAL
+}
+
+sink format_printf {
+    description "interprets its first argument as a format string"
+    function printf
+    arguments 0
+    context format
+    category "format-string"
+    severity MEDIUM
+}
+
+# --------------------------------------------------------------- sanitizers
+sanitizer shell_escape {
+    description "quotes shell metacharacters; neutralises command context taint only"
+    function shell_escape
+    argument 0
+    context command
+}
+
+sanitizer sql_escape {
+    description "escapes SQL metacharacters; neutralises SQL context taint only"
+    function sql_escape
+    argument 0
+    context sql
+}
+
+sanitizer html_escape {
+    description "escapes HTML metacharacters; neutralises HTML context taint only"
+    function html_escape
+    argument 0
+    context html
+}
+
+sanitizer path_normalize {
+    description "normalises a path and removes traversal sequences; neutralises path context taint only"
+    function path_normalize
+    argument 0
+    context path
+}
+
+sanitizer parse_to_int {
+    description "parses its argument into an integer, destroying the text representation of the value"
+    function to_int
+    argument 0
+    context *
+}
+
+# --------------------------------------------------------------- validators
+validator validate_command {
+    description "predicate: true only when the argument is a known-safe command name"
+    function is_safe_command
+    argument 0
+    context command
+}
+
+validator validate_path {
+    description "predicate: true only when the argument is inside the permitted directory"
+    function is_valid_path
+    argument 0
+    context path
+}
+
+# ------------------------------------------------------------------- flows
+flow command_execution {
+    description "untrusted data reaches a command execution operation"
+    severity HIGH
+    category "command-injection"
+    sources stdin, stdin_int, environment, command_line, file_content
+    sinks command_system, command_exec, command_popen
+    sanitizers shell_escape, parse_to_int, validate_command
+    enabled true
+}
+
+flow sql_injection {
+    description "untrusted data reaches a database query"
+    severity CRITICAL
+    category "sql-injection"
+    sources stdin, environment, command_line, file_content
+    sinks sql_exec
+    sanitizers sql_escape, parse_to_int
+    enabled true
+}
+
+flow path_traversal {
+    description "untrusted data reaches a filesystem path"
+    severity HIGH
+    category "path-traversal"
+    sources stdin, environment, command_line, file_content
+    sinks path_fopen, path_readfile, path_writefile
+    sanitizers path_normalize, parse_to_int, validate_path
+    enabled true
+}
+
+flow format_string {
+    description "untrusted data is used as a format string"
+    severity MEDIUM
+    category "format-string"
+    sources stdin, environment, command_line, file_content
+    sinks format_printf
+    sanitizers parse_to_int
+    enabled true
+}

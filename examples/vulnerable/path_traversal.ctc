@@ -1,0 +1,8 @@
+// expect: 1 finding, rule path_traversal, HIGH
+int main() {
+  string requested = argv(1);
+  string path = "/var/www/" + requested;
+  string contents = readfile(path);
+  print(contents);
+  return 0;
+}

@@ -1,0 +1,8 @@
+// expect: no findings: the sink sits in a branch whose condition is the literal 0
+int main() {
+  string name = input();
+  if (0) {
+    system(name);
+  }
+  return 0;
+}
