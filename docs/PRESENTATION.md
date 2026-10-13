@@ -54,9 +54,12 @@ the port before the audience arrives; if the port is busy the engine says so.
 6. **Program Slicing** — *Security slice of this finding*; read one reason from a
    row: it names the definition and the read it reaches.
 7. **Rule Editor** — *Load example rule file* (`examples/custom_rules/strict_rules.ctrule`),
-   *Validate* (no diagnostics, rule counts), then *Analyse a file with these
-   rules*. Show that the custom rule fires where the built-in did not, and that
-   the wrong-context sanitiser does not stop the flow.
+   *Validate* (no diagnostics, rule counts, grammar states), then *Use these rules
+   for an analysis*, which puts the file in the Analyze page's custom-rules box;
+   load `custom_rules/custom_rule_demo.ctc` and press *Run analysis*. Show that
+   the custom rule fires where the built-in rules did not, and that the
+   wrong-context sanitiser does not stop the flow. Also show that a broken rule
+   file is rejected with `line:col` and never used.
 8. **Reports** — download the JSON report, open the HTML report, then compare the
    vulnerable run with the sanitised one and read the *resolved* bucket.
 9. Close on **Documentation** — the language subset, the diagnostic catalogue and

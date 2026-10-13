@@ -365,3 +365,108 @@ test('no view renders a placeholder leak', async () => {
     assert.equal(page.document.getElementById('global-error').hidden, true, `${route} shows no error banner`);
   }
 });
+
+test('a partial analysis says so in the interface instead of looking clean', async () => {
+  // The engine marks a run partial when a construct outside the subset was
+  // skipped; the interface must repeat that, so a short finding list is never
+  // mistaken for a clean bill of health.  This test pins the payload keys the
+  // views read (`summary.analysis_complete`, `summary.partial_reasons`).
+  await go('analyze');
+  page.document.getElementById('source-input').value =
+    'int main() { switch (1) { case 1: return 0; } return 0; }\n';
+  page.document.getElementById('filename-input').value = 'partial-fixture.ctc';
+  page.document.getElementById('use-builtin').checked = true;
+  page.document.getElementById('analyze-button').click();
+
+  // Wait for *this* run, not for the previous test's status text: the old run's
+  // "run <id>" line is still on the page until the new payload arrives.
+  await waitFor(
+    () => {
+      const text = page.document.getElementById('analyze-status').textContent;
+      return text.includes('partial-fixture.ctc') && text.includes('run ');
+    },
+    'the partial analysis to finish',
+    30000,
+  );
+
+  const { state } = await import('../js/state.js');
+  assert.equal(state.run.filename, 'partial-fixture.ctc');
+  assert.equal(state.run.summary.analysis_complete, false, 'the engine reports the run as partial');
+  assert.ok(state.run.summary.partial_reasons.length > 0, 'the reasons are named');
+  assert.equal(state.run.findings.length, 0, 'no finding is claimed for a skipped region');
+
+  const diagnostics = page.document.getElementById('analyze-diagnostics').textContent;
+  assert.match(diagnostics, /This analysis is partial/);
+  assert.match(diagnostics, /LEX100|LEX102|SYN100/, 'the unsupported construct is named');
+
+  await go('findings');
+  const findingsText = viewText('findings');
+  assert.match(findingsText, /the analysis was partial/, 'the findings page repeats the warning');
+});
+
+test('an analysis uses the rules written in the Analyze page box, not another page\'s', async () => {
+  const { api } = await import('../js/api.js');
+  await go('analyze');
+
+  // A broken rule file is left in the Rule Editor.  It must not be applied to an
+  // analysis started here, where the custom-rules box is empty: the built-in
+  // rules alone have to find the flow.
+  page.document.getElementById('rule-editor').value = 'version 1\nsink\n';
+  page.document.getElementById('rules-input').value = '';
+  page.document.getElementById('source-input').value =
+    'int main() {\n  string cmd = input();\n  system(cmd);\n  return 0;\n}\n';
+  page.document.getElementById('filename-input').value = 'builtin-only.ctc';
+  page.document.getElementById('analyze-button').click();
+
+  const { state } = await import('../js/state.js');
+  await waitFor(
+    () => {
+      const text = page.document.getElementById('analyze-status').textContent;
+      return text.includes('builtin-only.ctc') && text.includes('run ');
+    },
+    'the analysis with the built-in rules',
+    30000,
+  );
+  assert.equal(state.run.findings.length, 1, 'the built-in rule set reported the flow');
+  assert.equal(state.run.rules.origin, 'built-in rules');
+
+  // Now write the shipped custom rule file into the Analyze page box: it has to
+  // be the rule set the engine uses, and it has to find the custom sink.
+  const rules = await api.example('custom_rules/strict_rules.ctrule');
+  const demo = await api.example('custom_rules/custom_rule_demo.ctc');
+  page.document.getElementById('rules-input').value = rules.content;
+  page.document.getElementById('source-input').value = demo.content;
+  page.document.getElementById('filename-input').value = 'custom-demo.ctc';
+  page.document.getElementById('analyze-button').click();
+
+  await waitFor(
+    () => {
+      const text = page.document.getElementById('analyze-status').textContent;
+      return text.includes('custom-demo.ctc') && text.includes('run ');
+    },
+    'the analysis with the custom rules',
+    30000,
+  );
+  assert.equal(state.run.filename, 'custom-demo.ctc');
+  assert.equal(state.run.rules.origin, 'built-in rules + submitted rules');
+  assert.equal(state.run.rules.sources, 6, 'the submitted source rule was merged in');
+  assert.equal(state.run.rules.sinks, 9, 'the submitted sink rule was merged in');
+  assert.equal(state.run.findings.length, 1, 'the custom sink is reported once');
+  assert.equal(state.run.findings[0].rule_id, 'audit_injection');
+  assert.equal(state.run.findings[0].sink.function, 'audit_write');
+
+  // The Rule Editor's own text is still the broken file: it never leaked.
+  assert.match(page.document.getElementById('rule-editor').value, /^version 1\nsink/);
+
+  // The hand-over button copies the editor's file into that box, visibly.
+  await go('rules');
+  page.document.getElementById('rule-editor').value = rules.content;
+  page.document.getElementById('analyze-with-rules-button').click();
+  await settle(20);
+  assert.equal(page.window.location.hash, '#/analyze');
+  assert.equal(page.document.getElementById('rules-input').value, rules.content);
+  assert.match(
+    page.document.getElementById('analyze-status').textContent,
+    /now in the custom rules box/,
+  );
+});

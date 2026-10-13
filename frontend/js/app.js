@@ -268,6 +268,11 @@ function wireInputs() {
   const view = document.getElementById('view-analyze');
   const editor = view.querySelector('#source-input');
   const filename = view.querySelector('#filename-input');
+  // The custom rules used by an analysis are the ones written in the Analyze
+  // page's own box.  Reading the Rule Editor's textarea here would apply rules
+  // that this page does not show, which is exactly the kind of silent mismatch
+  // a security tool must not have.
+  const customRules = view.querySelector('#rules-input');
   const rules = document.getElementById('rule-editor');
 
   editor.addEventListener('input', () => update({ source: editor.value }));
@@ -279,7 +284,7 @@ function wireInputs() {
       source: editor.value,
       parserMode: view.querySelector('#parser-mode').value,
       useBuiltin: view.querySelector('#use-builtin').checked,
-      customRules: rules.value,
+      customRules: customRules.value,
       runDependencies: view.querySelector('#run-dependencies').checked,
     });
     if (run) {
@@ -337,12 +342,20 @@ function wireInputs() {
   });
 
   document.getElementById('analyze-with-rules-button').addEventListener('click', async () => {
+    // Moving the rule file to the Analyze page is explicit: the same text is
+    // placed in that page's own custom-rules box, so what the user reads there
+    // is what the engine will be given.  Nothing is added to the source box.
     const view2 = document.getElementById('view-analyze');
-    document.getElementById('source-input').value = document.getElementById('source-input').value
-      || '// paste a program here, or load examples/custom_rules/custom_rule_demo.ctc\nint main() {\n  string body = http_body();\n  audit_write(body);\n  return 0;\n}\n';
-    update({ source: document.getElementById('source-input').value });
+    const customRules = view2.querySelector('#rules-input');
+    customRules.value = rules.value;
     window.location.hash = '#/analyze';
     refresh('analyze');
+    const status = view2.querySelector('#analyze-status');
+    render(status, [el('span', {
+      text: rules.value.trim()
+        ? 'The rule file from the Rule Editor is now in the custom rules box; it is validated when the analysis runs.'
+        : 'The Rule Editor is empty: write a rule file there, or load the example, before using this button.',
+    })]);
   });
 
   document.getElementById('theme-toggle').addEventListener('click', (event) => {

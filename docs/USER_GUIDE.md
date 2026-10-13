@@ -49,7 +49,8 @@ proxy configuration is needed.
    definitions*, *liveness* and *definite assignment*; the per-statement IN/OUT
    values come from the fixpoint, not from a heuristic walk.
 7. **Rule Editor** — *Load example rule file*, press *Validate*, then
-   *Analyse a file with these rules* to see the custom rule fire.
+   *Use these rules for an analysis*: the rule file is placed in the custom-rules
+   box of the Analyze Code page, where *Run analysis* then applies it.
 8. **Reports** — download the JSON report, open the HTML report, and compare the
    run before and after your fix.
 
@@ -122,8 +123,11 @@ over-approximations.
 Paste a rule file, or press *Load example rule file*; *Validate* parses it and
 reports every diagnostic with `line:col`, the rule counts and the states and
 conflicts of the rule-language grammar (a conflict would be printed, not hidden).
-*Analyse a file with these rules* then runs that policy against the source in the
-editor, and the *Active rules* table lists the rule set the engine would use.
+*Use these rules for an analysis* copies the editor's rule file into the
+custom-rules box of the Analyze Code page (the box the engine actually reads) and
+switches to that page, so what you see there is what the analysis will use. The
+*Active rules* table lists the rule set the engine would use, and a rule file
+that does not validate is rejected with `line:col` before any analysis runs.
 
 ### Reports
 
