@@ -632,15 +632,15 @@ def check_claims() -> None:
     diagnostic_only = [c for c in cases if c["label"] in ("unsupported", "syntax_error")]
     declared = sum(len(c.get("expect") or []) for c in cases)
     check(
-        "the three metric groups partition the corpus (15 + 8 + 6 = 29)",
-        (len(finding_level), len(file_level), len(diagnostic_only)) == (15, 8, 6)
-        and len(finding_level) + len(file_level) + len(diagnostic_only) == len(cases) == 29,
+        "the three metric groups partition the corpus (18 + 9 + 6 = 33)",
+        (len(finding_level), len(file_level), len(diagnostic_only)) == (18, 9, 6)
+        and len(finding_level) + len(file_level) + len(diagnostic_only) == len(cases) == 33,
         f"{len(finding_level)} finding-level + {len(file_level)} file-level + "
         f"{len(diagnostic_only)} diagnostic-only = {len(cases)}",
     )
     check(
-        "the corpus declares the 17 expectations the documents quote",
-        declared == 17,
+        "the corpus declares the 20 expectations the documents quote",
+        declared == 20,
         declared,
     )
     check(
@@ -681,6 +681,75 @@ def check_claims() -> None:
         {"parser", "semantics", "cfg", "dataflow", "taint", "slicing", "rules", "reporting"}
         <= areas,
         sorted(areas),
+    )
+
+    # -- the module table in docs/TECHNICAL_DESIGN.md ----------------------
+    # The table is the part of the documentation most likely to rot, because
+    # every edit to the tree changes it.  Re-derive it here rather than trusting
+    # the numbers in the prose.
+    module_rows = {}
+    for line in open(os.path.join(ROOT, "docs", "TECHNICAL_DESIGN.md"), encoding="utf-8"):
+        match = re.match(r"\| `([^`]+)` \| (\d+) \| (\d+) \|", line)
+        if match:
+            module_rows[match.group(1)] = (int(match.group(2)), int(match.group(3)))
+
+    def measure(relative: str, suffix: str = "") -> tuple:
+        base = os.path.join(ROOT, relative.rstrip("/"))
+        if not os.path.isdir(base):
+            return (0, 0)
+        files = []
+        for dirpath, dirnames, filenames in os.walk(base):
+            dirnames[:] = [d for d in dirnames if d not in {"__pycache__", "node_modules"}]
+            for name in filenames:
+                if suffix and not name.endswith(suffix):
+                    continue
+                files.append(os.path.join(dirpath, name))
+        total = 0
+        for path in files:
+            with open(path, encoding="utf-8", errors="replace") as handle:
+                total += len(handle.read().splitlines())
+        return (len(files), total)
+
+    def measure_root_py() -> tuple:
+        names = [n for n in sorted(os.listdir(os.path.join(ROOT, "codetrace")))
+                 if n.endswith(".py")]
+        total = sum(len(open(os.path.join(ROOT, "codetrace", n), encoding="utf-8").read().splitlines())
+                    for n in names)
+        return (len(names), total)
+
+    measured = {
+        "codetrace/frontend": measure("codetrace/frontend", ".py"),
+        "codetrace/semantics": measure("codetrace/semantics", ".py"),
+        "codetrace/analysis": measure("codetrace/analysis", ".py"),
+        "codetrace/rules": measure("codetrace/rules", ".py"),
+        "codetrace/findings": measure("codetrace/findings", ".py"),
+        "codetrace/reporting": measure("codetrace/reporting", ".py"),
+        "codetrace/api": measure("codetrace/api", ".py"),
+        "codetrace/*.py": measure_root_py(),
+        "tests/": measure("tests", ".py"),
+        "frontend/tests/": measure("frontend/tests"),
+        "evaluation/": measure("evaluation"),
+        "scripts/": measure("scripts"),
+        "docs/": measure("docs"),
+        "examples/": measure("examples"),
+    }
+    # frontend/ in the table means the interface assets, which are everything
+    # under frontend/ except the interface tests.
+    app_files, app_lines = measure("frontend")
+    test_files, test_lines = measure("frontend/tests")
+    measured["frontend/"] = (app_files - test_files, app_lines - test_lines)
+
+    drift = []
+    for name, expected in measured.items():
+        actual = module_rows.get(name)
+        if actual is None:
+            drift.append(f"{name}: missing from the table")
+        elif actual != expected:
+            drift.append(f"{name}: table says {actual}, tree has {expected}")
+    check(
+        "the module table in docs/TECHNICAL_DESIGN.md matches the tree",
+        not drift,
+        drift,
     )
 
     # -- validator guards: a suppressed flow is reported as suppressed -----

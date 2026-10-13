@@ -46,24 +46,26 @@ itself. `python3 -m codetrace.api` is the whole deployment.
 | --- | --- | --- | --- |
 | `codetrace/frontend` | 9 | 3222 | tokens, lexer, grammar (NULLABLE/FIRST/FOLLOW, closure, GOTO, canonical/LALR/SLR automata), LR tables and parser, AST nodes, grammar documentation, pipeline (`parse_source`, cached `parser_tables`) |
 | `codetrace/semantics` | 4 | 1352 | scopes and symbol table, external resolution through the rule set, type checks, per-statement accesses (reads/writes/definitions) |
-| `codetrace/analysis` | 11 | 3924 | CFG, data-flow framework + reaching definitions / liveness / definite assignment, taint, dependency graph, slicing, `Program` orchestration |
+| `codetrace/analysis` | 11 | 4036 | CFG, data-flow framework + reaching definitions / liveness / definite assignment, taint, dependency graph, slicing, `Program` orchestration |
 | `codetrace/rules` | 3 | 1026 | rule model and validation, declarative rule language parser, built-in rule loader (plus `builtin/standard.ctrule`) |
 | `codetrace/findings` | 3 | 1225 | finding model and stable identity, run comparison, explanation and certainty |
-| `codetrace/reporting` | 3 | 482 | JSON report, self-contained HTML report |
-| `codetrace/api` | 4 | 1039 | HTTP server, routing, request validation, limits, schemas catalogue, `python3 -m` entry point |
+| `codetrace/reporting` | 3 | 650 | JSON report, self-contained HTML report |
+| `codetrace/api` | 4 | 1079 | HTTP server, routing, request validation, limits, schemas catalogue, `python3 -m` entry point |
 | `codetrace/*.py` | 2 | 22 | version constants and the package docstring |
-| `tests/` | 13 | 4314 | lexer, parser, semantics, CFG, data flow, taint, slicing, rules, API, reporting, end-to-end workflow |
-| `frontend/` | 20 | 2748 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
-| `frontend/tests/` | 4 | 1212 | stub DOM, harness, library tests, view tests against a real engine |
-| `evaluation/` | 2 | 579 | labelled corpus harness and `expectations.json` |
-| `scripts/` | 4 | 715 | dev server, full test run, corpus evaluation, independent audit |
-| `docs/` | 11 | 3227 | the documentation set (see `README.md`) |
-| `examples/` | 30 | 273 | 29 labelled `.ctc` sources and one example rule file |
+| `tests/` | 14 | 4856 | lexer, parser, semantics, CFG, data flow, taint, slicing, rules, API, reporting, end-to-end workflow |
+| `frontend/` | 20 | 2833 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
+| `frontend/tests/` | 4 | 1365 | stub DOM, harness, library tests, view tests against a real engine |
+| `evaluation/` | 2 | 754 | labelled corpus harness and `expectations.json` |
+| `scripts/` | 5 | 1325 | dev server, full test run, corpus evaluation, independent audit, mutation check |
+| `docs/` | 12 | 3712 | the documentation set (see `README.md`) |
+| `examples/` | 34 | 307 | 33 labelled `.ctc` sources and one example rule file |
 
-Total implementation: 12 292 lines of Python in `codetrace/` (39 files), 4 314
-lines of engine tests, 3 960 lines of frontend assets (of which 1 212 are the
-interface tests), 715 lines of scripts and 3 227 lines of documentation. Counted
-with line counts that include blank lines and comments.
+Total implementation: 12 612 lines of Python in `codetrace/` (39 files), 4 856
+lines of engine tests, 4 198 lines of frontend assets (of which 1 365 are the
+interface tests), 1 325 lines of scripts and 3712 lines of documentation.
+Counted with `wc -l`-style line counts, which include blank lines and comments;
+re-measure with `python3 scripts/audit.py -v`, which re-derives the module table
+from the tree instead of trusting this paragraph.
 
 ## 4. Module boundaries
 

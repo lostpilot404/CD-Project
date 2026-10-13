@@ -34,7 +34,9 @@ proxy configuration is needed.
 1. **Analyze Code** — press *Load example…* and pick
    `vulnerable/command_injection.ctc`, then *Run analysis*. The status line shows
    the run id and the analysis time.
-2. **Findings** — one finding is listed. Click it.
+2. **Findings** — one finding is listed. Click it. (If a program produces
+   nothing, read the *What the engine saw but did not report* panel on the
+   Analyze Code page before concluding the file is clean.)
 3. Read the detail panel top to bottom: **Why this was reported** (the
    explanation), **Evidence path** (source → declaration → sink, one line per
    step with the taint atoms), **Branch conditions on this path** (empty here),
@@ -75,6 +77,16 @@ Diagnostics (lexer, parser, semantic, CFG, data-flow) are listed with their
 `line:col`; the run summary states whether the analysis was complete, and lists
 everything that was outside the supported subset. A file that does not parse is
 **not** presented as analysed.
+
+Below the summary, **What the engine saw but did not report** explains the
+result rather than leaving it to the finding count: how many sink calls were
+inspected, how many became findings, every sink call that was inspected and
+turned down (with the reason — no taint reached it, the branch is statically
+dead, or a declared validator was assumed to reject it), the validator guards
+that cleared a flow, the branches pruned as unreachable, and the notes the run
+recorded. This is where you look when the analysis reports nothing: it is the
+difference between "the flow never existed" and "the flow exists and something
+was assumed to stop it".
 
 ### Findings
 

@@ -37,7 +37,7 @@ No third-party package is needed anywhere in the pipeline: there is no
 scripts/tests.sh                 # every suite: engine, API, reporting, workflow, interface
 scripts/tests.sh engine          # Python suites only (no Node needed)
 scripts/evaluate.sh              # the labelled corpus, JSON evidence in var/
-python3 scripts/audit.py         # independent Definition-of-Done audit (68 checks)
+python3 scripts/audit.py         # independent Definition-of-Done audit (69 checks)
 python3 scripts/audit.py -v      # ... printing the value behind every check
 python3 scripts/mutation_check.py  # break the engine on purpose: does the suite notice?
 python3 scripts/mutation_check.py --list   # the mutation catalogue, no changes made
@@ -76,7 +76,7 @@ frontend/              interface: index.html, css, ES modules (no build step, no
 frontend/tests/        interface tests against a real engine (Node test runner)
 tests/                 engine suite: lexer, parser, semantics, CFG, data-flow,
                        taint, slicing, rules, API, reporting, end-to-end workflow
-examples/              29 labelled `.ctc` files and one example rule file
+examples/              33 labelled `.ctc` files and one example rule file
 evaluation/            harness + `expectations.json` labels for the corpus
 scripts/               serve.sh, tests.sh, evaluate.sh, audit.py, mutation_check.py
 docs/                  the documentation set (below)
@@ -97,6 +97,7 @@ docs/                  the documentation set (below)
 | `docs/LIMITATIONS.md` | what the analysis does not do, per finding, and the threat model of the tool itself |
 | `docs/EVALUATION.md` | how the labelled corpus was built and what the measured numbers mean |
 | `docs/PRESENTATION.md` | talk outline, demo script and viva questions |
+| `docs/FINAL_REPORT.md` | the completion report: what was built, the evidence for each claim, and what is not done |
 
 The Documentation page inside the application serves the same facts from the
 engine itself (language mode, grammar statistics, diagnostic catalogue, rule
@@ -108,8 +109,8 @@ language), so the interface cannot claim more than the engine implements.
 | --- | --- | --- |
 | Engine, API, reporting, workflow | `python3 -m unittest discover -s tests -t .` | 282 tests, all passing |
 | Interface | `cd frontend && npm test` | 30 tests, all passing (real engine over HTTP, stub DOM) |
-| Labelled corpus | `scripts/evaluate.sh` | 29 files, 17 expected findings, TP 17 / FP 0 / FN 0, file-level TN 8/8, precision = recall = F1 = 1.0, ≈1.2 s total |
-| Independent audit | `python3 scripts/audit.py` | 68 checks covering grammar, hand-computed data flow, graph edges, slices, rules, the HTTP workflow, malformed input, the interface contract, document accuracy and the claims the documents make about the code |
+| Labelled corpus | `scripts/evaluate.sh` | 33 files, 20 expected findings, TP 20 / FP 0 / FN 0, file-level TN 9/9, precision = recall = F1 = 1.0, ≈1.2 s total |
+| Independent audit | `python3 scripts/audit.py` | 69 checks covering grammar, hand-computed data flow, graph edges, slices, rules, the HTTP workflow, malformed input, the interface contract, document accuracy, the claims the documents make about the code, and drift between the module table and the tree |
 | Mutation check | `python3 scripts/mutation_check.py` | 18 deliberate defects (parser, semantics, CFG, data flow, taint, slicing, rules, reporting); the suite has to catch every one, and does (18/18) |
 
 The evaluation numbers describe this corpus only. See `docs/EVALUATION.md` for

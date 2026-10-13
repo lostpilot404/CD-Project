@@ -9,7 +9,13 @@
       "label": "vulnerable",
       "rationale": "input() is concatenated into a command and passed to system() through a helper function.",
       "expect": [
-        {"rule": "command_execution", "category": "command-injection", "severity": "HIGH", "sink_statement": "system(command);", "source_rule": "stdin"}
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(command);",
+          "source_rule": "stdin"
+        }
       ],
       "expect_diagnostics": []
     },
@@ -18,7 +24,13 @@
       "label": "vulnerable",
       "rationale": "A user-controlled string is interpolated into a query executed by sql_exec().",
       "expect": [
-        {"rule": "sql_injection", "category": "sql-injection", "severity": "CRITICAL", "sink_statement": "sql_exec(query);", "source_rule": "stdin"}
+        {
+          "rule": "sql_injection",
+          "category": "sql-injection",
+          "severity": "CRITICAL",
+          "sink_statement": "sql_exec(query);",
+          "source_rule": "stdin"
+        }
       ],
       "expect_diagnostics": []
     },
@@ -27,7 +39,13 @@
       "label": "vulnerable",
       "rationale": "A command-line argument is appended to a directory prefix and read as a file.",
       "expect": [
-        {"rule": "path_traversal", "category": "path-traversal", "severity": "HIGH", "sink_statement": "string contents = readfile(path);", "source_rule": "command_line"}
+        {
+          "rule": "path_traversal",
+          "category": "path-traversal",
+          "severity": "HIGH",
+          "sink_statement": "string contents = readfile(path);",
+          "source_rule": "command_line"
+        }
       ],
       "expect_diagnostics": []
     },
@@ -36,7 +54,13 @@
       "label": "vulnerable",
       "rationale": "An environment variable is used directly as a format string.",
       "expect": [
-        {"rule": "format_string", "category": "format-string", "severity": "MEDIUM", "sink_statement": "printf(format);", "source_rule": "environment"}
+        {
+          "rule": "format_string",
+          "category": "format-string",
+          "severity": "MEDIUM",
+          "sink_statement": "printf(format);",
+          "source_rule": "environment"
+        }
       ],
       "expect_diagnostics": []
     },
@@ -45,7 +69,13 @@
       "label": "vulnerable",
       "rationale": "Taint survives two copies before reaching the sink.",
       "expect": [
-        {"rule": "command_execution", "category": "command-injection", "severity": "HIGH", "sink_statement": "system(step_three);", "source_rule": "stdin"}
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(step_three);",
+          "source_rule": "stdin"
+        }
       ],
       "expect_diagnostics": []
     },
@@ -110,7 +140,13 @@
       "label": "vulnerable",
       "rationale": "Taint crosses a function boundary through the return value.",
       "expect": [
-        {"rule": "command_execution", "category": "command-injection", "severity": "HIGH", "sink_statement": "system(command);", "source_rule": "stdin"}
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(command);",
+          "source_rule": "stdin"
+        }
       ],
       "expect_diagnostics": []
     },
@@ -119,7 +155,13 @@
       "label": "vulnerable",
       "rationale": "Taint crosses two call boundaries: through an argument, a parameter and a return value.",
       "expect": [
-        {"rule": "command_execution", "category": "command-injection", "severity": "HIGH", "sink_statement": "return system(command);", "source_rule": "stdin"}
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "return system(command);",
+          "source_rule": "stdin"
+        }
       ],
       "expect_diagnostics": []
     },
@@ -128,7 +170,14 @@
       "label": "vulnerable",
       "rationale": "A recursive helper returns its argument. Recursion is handled with a bounded summary fixpoint, so the flow is reported with certainty 'approximate' rather than 'confirmed'.",
       "expect": [
-        {"rule": "command_execution", "category": "command-injection", "severity": "HIGH", "sink_statement": "system(command);", "source_rule": "stdin", "certainty": "approximate"}
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(command);",
+          "source_rule": "stdin",
+          "certainty": "approximate"
+        }
       ],
       "expect_diagnostics": []
     },
@@ -137,8 +186,20 @@
       "label": "vulnerable",
       "rationale": "sql_escape is declared for the SQL context only; it must not clear command taint, and the raw value still reaches sql_exec.",
       "expect": [
-        {"rule": "command_execution", "category": "command-injection", "severity": "HIGH", "sink_statement": "system(quoted);", "source_rule": "stdin"},
-        {"rule": "sql_injection", "category": "sql-injection", "severity": "CRITICAL", "sink_statement": "sql_exec(name);", "source_rule": "stdin"}
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(quoted);",
+          "source_rule": "stdin"
+        },
+        {
+          "rule": "sql_injection",
+          "category": "sql-injection",
+          "severity": "CRITICAL",
+          "sink_statement": "sql_exec(name);",
+          "source_rule": "stdin"
+        }
       ],
       "expect_diagnostics": []
     },
@@ -147,16 +208,30 @@
       "label": "vulnerable",
       "rationale": "An unmodelled function must not be assumed to sanitise its argument.",
       "expect": [
-        {"rule": "command_execution", "category": "command-injection", "severity": "HIGH", "sink_statement": "system(processed);", "source_rule": "stdin"}
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(processed);",
+          "source_rule": "stdin"
+        }
       ],
-      "expect_diagnostics": ["SEM008"]
+      "expect_diagnostics": [
+        "SEM008"
+      ]
     },
     {
       "file": "challenges/array_element_taint.ctc",
       "label": "vulnerable",
       "rationale": "The engine does not track array elements individually, so an element write taints the array; documented and reported.",
       "expect": [
-        {"rule": "command_execution", "category": "command-injection", "severity": "HIGH", "sink_statement": "system(parts[0]);", "source_rule": "stdin"}
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(parts[0]);",
+          "source_rule": "stdin"
+        }
       ],
       "expect_diagnostics": []
     },
@@ -165,7 +240,13 @@
       "label": "vulnerable",
       "rationale": "The flow is reported as structurally possible, with the guarding condition recorded and not evaluated.",
       "expect": [
-        {"rule": "command_execution", "category": "command-injection", "severity": "HIGH", "sink_statement": "system(name);", "source_rule": "stdin"}
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(name);",
+          "source_rule": "stdin"
+        }
       ],
       "expect_diagnostics": []
     },
@@ -174,8 +255,20 @@
       "label": "vulnerable",
       "rationale": "Two different sources reach two different sinks.",
       "expect": [
-        {"rule": "command_execution", "category": "command-injection", "severity": "HIGH", "sink_statement": "system(from_stdin);", "source_rule": "stdin"},
-        {"rule": "path_traversal", "category": "path-traversal", "severity": "HIGH", "sink_statement": "readfile(from_env);", "source_rule": "environment"}
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(from_stdin);",
+          "source_rule": "stdin"
+        },
+        {
+          "rule": "path_traversal",
+          "category": "path-traversal",
+          "severity": "HIGH",
+          "sink_statement": "readfile(from_env);",
+          "source_rule": "environment"
+        }
       ],
       "expect_diagnostics": []
     },
@@ -184,7 +277,13 @@
       "label": "vulnerable",
       "rationale": "Taint is carried through a loop-carried assignment inside a while body.",
       "expect": [
-        {"rule": "command_execution", "category": "command-injection", "severity": "HIGH", "sink_statement": "system(value);", "source_rule": "stdin"}
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(value);",
+          "source_rule": "stdin"
+        }
       ],
       "expect_diagnostics": []
     },
@@ -193,28 +292,38 @@
       "label": "unsupported",
       "rationale": "switch is not part of the analysed subset; the file must produce explicit diagnostics (unsupported keyword and operator) instead of being analysed as if switch were safe. Recovery limits the error cascade, so SYN011 (too many errors) is deliberately not expected.",
       "expect": [],
-      "expect_diagnostics": ["LEX100", "LEX102", "SYN100"]
+      "expect_diagnostics": [
+        "LEX100",
+        "LEX102",
+        "SYN100"
+      ]
     },
     {
       "file": "unsupported/preprocessor_directive.ctc",
       "label": "unsupported",
       "rationale": "A preprocessor directive is outside the subset and is reported.",
       "expect": [],
-      "expect_diagnostics": ["LEX101"]
+      "expect_diagnostics": [
+        "LEX101"
+      ]
     },
     {
       "file": "unsupported/pointer_type.ctc",
       "label": "unsupported",
       "rationale": "Pointer types are outside the subset: the declarator cannot be parsed, and the parser reports a located syntax error instead of guessing.",
       "expect": [],
-      "expect_diagnostics": ["SYN001"]
+      "expect_diagnostics": [
+        "SYN001"
+      ]
     },
     {
       "file": "syntax_errors/missing_semicolon.ctc",
       "label": "syntax_error",
       "rationale": "One missing semicolon must yield a located syntax error and recovery that still parses the rest of the function.",
       "expect": [],
-      "expect_diagnostics": ["SYN001"],
+      "expect_diagnostics": [
+        "SYN001"
+      ],
       "min_syntax_errors": 1
     },
     {
@@ -222,14 +331,18 @@
       "label": "syntax_error",
       "rationale": "An unclosed brace must be reported rather than silently accepted.",
       "expect": [],
-      "expect_diagnostics": ["SYN001"]
+      "expect_diagnostics": [
+        "SYN001"
+      ]
     },
     {
       "file": "syntax_errors/broken_expression.ctc",
       "label": "syntax_error",
       "rationale": "An operator without a right operand must be reported at the failing token.",
       "expect": [],
-      "expect_diagnostics": ["SYN001"]
+      "expect_diagnostics": [
+        "SYN001"
+      ]
     },
     {
       "file": "custom_rules/custom_rule_demo.ctc",
@@ -237,9 +350,71 @@
       "rules": "custom_rules/strict_rules.ctrule",
       "rationale": "With the custom rule file loaded, exactly one flow is reported (the unescaped value); built-in rules add nothing because the file uses fictional APIs.",
       "expect": [
-        {"rule": "audit_injection", "category": "arbitrary-file-write", "severity": "MEDIUM", "sink_statement": "audit_write(body);", "source_rule": "request_body"}
+        {
+          "rule": "audit_injection",
+          "category": "arbitrary-file-write",
+          "severity": "MEDIUM",
+          "sink_statement": "audit_write(body);",
+          "source_rule": "request_body"
+        }
       ],
-      "expect_diagnostics": ["SEM008"]
+      "expect_diagnostics": [
+        "SEM008"
+      ]
+    },
+    {
+      "file": "challenges/decoy_in_comment_and_string.ctc",
+      "label": "vulnerable",
+      "rationale": "A comment and a string literal both contain sink-looking text; only the real call is a flow, so exactly one finding must be reported and the decoys must be ignored (the analysis parses, it does not search text).",
+      "expect": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(command);",
+          "source_rule": "stdin"
+        }
+      ],
+      "expect_diagnostics": []
+    },
+    {
+      "file": "challenges/negated_validator_guard.ctc",
+      "label": "vulnerable",
+      "rationale": "The declared validator guards the *false* edge of `if (!is_safe_command(name))`; the sink runs precisely where the value was not validated, so the flow must be reported (a guard is not a blanket silence).",
+      "expect": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(name);",
+          "source_rule": "stdin"
+        }
+      ],
+      "expect_diagnostics": []
+    },
+    {
+      "file": "challenges/shadowed_variable.ctc",
+      "label": "vulnerable",
+      "rationale": "Two symbols share the spelling `name`: the inner one is a constant, the outer one is tainted. Only the outer sink is reported, which is what symbol identity (not name matching) means.",
+      "expect": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(name);",
+          "source_rule": "stdin"
+        }
+      ],
+      "expect_diagnostics": [
+        "SEM018"
+      ]
+    },
+    {
+      "file": "safe/killed_by_constant.ctc",
+      "label": "safe",
+      "rationale": "The tainted value is overwritten by a constant before the sink, so the reaching definition of the sink argument is the constant.",
+      "expect": [],
+      "expect_diagnostics": []
     }
   ]
 }

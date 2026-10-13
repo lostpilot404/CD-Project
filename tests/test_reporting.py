@@ -346,7 +346,7 @@ class EvaluationHarnessTests(unittest.TestCase):
         # The documentation states the coverage as "17 expectations in 15 files,
         # 8 file-level cases, 6 diagnostic-only cases".  That accounting has to
         # be a property of the corpus rather than a sentence in a document, or a
-        # later edit can quietly make "29 cases" sound like 29 detections.
+        # later edit can quietly make "33 cases" sound like 33 detections.
         with open(os.path.join(ROOT, "evaluation", "expectations.json"), "r", encoding="utf-8") as handle:
             expectations = json.load(handle)
         cases = expectations["cases"]
@@ -368,9 +368,9 @@ class EvaluationHarnessTests(unittest.TestCase):
             self.assertEqual(case.get("expect"), [], case["file"])
             self.assertTrue(case.get("expect_diagnostics"), case["file"])
         # And the counts the docs quote are the counts in the file.
-        self.assertEqual(sum(len(c.get("expect") or []) for c in cases), 17)
-        self.assertEqual(len(finding_level), 15)
-        self.assertEqual(len(file_level), 8)
+        self.assertEqual(sum(len(c.get("expect") or []) for c in cases), 20)
+        self.assertEqual(len(finding_level), 18)
+        self.assertEqual(len(file_level), 9)
         self.assertEqual(len(diagnostic_only), 6)
 
     def test_the_corpus_is_separate_from_the_unit_tests(self):

@@ -350,9 +350,11 @@ build_graph(program):
 
 * **Complexity:** O(S · atoms) for the def-use lookup (bitset membership is O(1))
   plus O(S) for control edges from an AST walk.
-* **Measured:** 2–8 nodes and edges for the small examples; `scripts/audit.py`
-  re-verifies every intra-procedural data/taint edge (6 edges in its example,
-  0 unjustified).
+* **Measured:** 5–13 nodes and 2–15 edges across the 27 analysable corpus files
+  (largest: `interprocedural/recursion.ctc`); `scripts/audit.py` re-verifies
+  every intra-procedural data/taint edge of its own example against the reaching
+  definitions (3 edges in that example, 0 unjustified) and fails if any edge
+  cannot be justified.
 
 ## 15. Slicing
 
@@ -412,20 +414,20 @@ compare(before, after):
 
 ## Complexity at a glance
 
-| Phase | Time | Measured on a 60-byte example |
+| Phase | Time | Measured on a 55-byte example (median of 25 runs) |
 | --- | --- | --- |
-| Lexing | O(n) | 0.09 ms |
-| LR parsing | O(t) | 0.26 ms |
-| Parser tables (cached) | O(states · P) per process | 0.9 ms first call, 0 after |
-| Semantics | O(nodes · depth) | 0.09 ms |
-| CFG | O(S) | 0.08 ms |
-| Reaching definitions + liveness (+ definite assignment) | O(A · E · w) | 0.23 ms |
-| Taint (summaries + replay) | O(functions · S · atoms) | 0.39 ms |
-| Dependency graph | O(S · atoms) | 0.07 ms |
-| Slicing (per query) | O(V + E) | 0.002 ms setup |
-| Findings + explanations | O(hits · path) | 0.01 ms |
+| Lexing | O(n) | 0.10 ms (0.09–0.16) |
+| LR parsing | O(t) | 0.49 ms (0.35–0.68) |
+| Parser tables (cached) | O(states · P) per process | 0.98 ms on the first analysis in a process, ~0 after |
+| Semantics | O(nodes · depth) | 0.08 ms (0.07–0.13) |
+| CFG | O(S) | 0.08 ms (0.07–0.12) |
+| Reaching definitions + liveness (+ definite assignment) | O(A · E · w) | 0.18 ms (0.16–0.27) |
+| Taint (summaries + replay) | O(functions · S · atoms) | 0.48 ms (0.45–0.63) |
+| Dependency graph | O(S · atoms) | 0.06 ms (0.05–0.08) |
+| Slicing (per query) | O(V + E) | 0.001 ms setup |
+| Findings + explanations | O(hits · path) | 0.32 ms (0.24–0.50) |
 
-Whole corpus: 29 files in **0.94 s** end to end (≈ 32 ms/file, including rule
+Whole corpus: 33 files in **≈1.2 s** end to end (≈ 36 ms/file, including rule
 loading, JSON serialisation and metric collection) on this machine. Numbers are
 reported per run in `metrics.timings`; the report does not claim better
 performance than it measures, and every timing is wall-clock in this environment

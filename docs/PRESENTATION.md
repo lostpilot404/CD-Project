@@ -30,7 +30,7 @@ the port before the audience arrives; if the port is busy the engine says so.
 | 7 | Taint: sources, sinks, sanitizers, context, certainty, and the honesty rules (unknown call keeps taint; no symbolic execution) | what the tool does *not* conclude | 2:00 |
 | 8 | Dependency graph and slices: typed edges with reasons, backward/forward/security slices | every edge is justified | 1:30 |
 | 9 | The interface: nine pages, evidence per finding, comparison of runs | a result a human can check | 1:30 |
-| 10 | Evaluation: 29 labelled files, TP 17, FP 0, FN 0, precision = recall = F1 = 1.0, 0.81 s | measured, on that corpus only | 1:30 |
+| 10 | Evaluation: 33 labelled files, TP 20, FP 0, FN 0, precision = recall = F1 = 1.0, ≈1.2 s | measured, on that corpus only | 1:30 |
 | 11 | Limitations and threat model | credibility | 1:00 |
 | 12 | What I would do next | judgement | 0:30 |
 
@@ -43,7 +43,12 @@ the port before the audience arrives; if the port is busy the engine says so.
    analysis.** Point at the summary: 1 finding, HIGH, and the statement/block
    counts. Then load `unsupported/switch_statement.ctc` and show the diagnostics
    panel: the construct is named, the file is marked partial, and no finding is
-   claimed for the skipped region.
+   claimed for the skipped region. Finally load
+   `sanitized/validated_command.ctc` and stay on this page: zero findings, but
+   *What the engine saw but did not report* says the sink call was inspected,
+   names the validator that cleared the flow, and states that the validator's
+   body was **not** analysed — the difference between "nothing reaches the sink"
+   and "something was assumed to stop it" is the point of that panel.
 3. Back to the vulnerable file, **Findings** page: filters, then the detail panel.
    Read the "Why this was reported" paragraph aloud; open **Evidence path** and
    show the `parameter` and `return` steps — that is the interprocedural hop.
@@ -65,7 +70,7 @@ the port before the audience arrives; if the port is busy the engine says so.
 9. Close on **Documentation** — the language subset, the diagnostic catalogue and
    the document list, all served by the engine.
 
-Fallback if something misbehaves live: `python3 scripts/audit.py` prints 68
+Fallback if something misbehaves live: `python3 scripts/audit.py` prints 69
 independent checks (grammar, hand-computed data flow, graph, slices, rules, HTTP
 workflow, malformed input, the interface contract, document accuracy) and each
 line states what it observed.
@@ -78,10 +83,10 @@ line states what it observed.
 | Tables | 167 states in LALR and SLR, 656 canonical LR(1) states, 0 conflicts in all three modes | same |
 | Rule language | 40 productions, 78 states, 0 conflicts | `/api/rules` |
 | Tests | 256 engine tests + 27 interface tests | `python3 -m unittest discover -s tests -t .`, `cd frontend && npm test` |
-| Audit | 68 checks | `python3 scripts/audit.py` |
+| Audit | 69 checks | `python3 scripts/audit.py` |
 | Mutation check | 18/18 deliberate defects caught | `python3 scripts/mutation_check.py` |
-| Corpus | 29 labelled files, 17 expected findings, TP 17 / FP 0 / FN 0, TN 8/8, P = R = F1 = 1.0 | `scripts/evaluate.sh` |
-| Speed | whole corpus in 0.81 s; median 7 ms per file; first file 0.60 s (table build included) | `scripts/evaluate.sh` |
+| Corpus | 33 labelled files, 20 expected findings, TP 20 / FP 0 / FN 0, TN 9/9, P = R = F1 = 1.0 | `scripts/evaluate.sh` |
+| Speed | whole corpus in ≈1.1 s; median ≈11 ms per file; first file ≈0.8 s (parser-table build included) | `scripts/evaluate.sh` |
 | Dependencies | none (Python 3.11 standard library only) | `ls requirements.txt` (absent) |
 
 Quote the environment with the timing: Python 3.11, Linux x86-64, 2 CPUs. The
@@ -250,7 +255,7 @@ someone else does.
     budget for the analysis. Hitting one sets `limits_hit`, marks the run partial
     and returns what was analysed up to that point; it never silently pretends the
     result is complete.
-31. **How was the evaluation corpus built?** 29 files, each with a comment header
+31. **How was the evaluation corpus built?** 33 files, each with a comment header
     stating the expected result, grouped as vulnerable (14 with findings), safe,
     sanitized, unsupported (3), syntax-error (3) and one custom-rule case; the
     labels are in `evaluation/expectations.json` and describe rule, category,
@@ -258,7 +263,7 @@ someone else does.
     from the unit tests so it can measure the tool rather than test its
     implementation.
 32. **What do precision = recall = F1 = 1.0 mean here, and what do they not
-    mean?** They mean that on those 29 files, every expected finding was reported
+    mean?** They mean that on those 33 files, every expected finding was reported
     (17/17), every reported finding was expected (0 false positives) and the
     diagnostic expectations matched. They say nothing about other code: the corpus
     is small, hand-written, drawn from the same language subset, and the negative
