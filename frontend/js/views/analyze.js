@@ -7,7 +7,7 @@
 import { el, render } from '../lib/dom.js';
 import { api, ApiError } from '../api.js';
 import { renderSource } from '../source.js';
-import { update } from '../state.js';
+import { resetForNewRun } from '../state.js';
 
 const DIAGNOSTIC_ORDER = { error: 0, warning: 1, info: 2 };
 
@@ -143,11 +143,19 @@ export function renderAnalyze(container, { state, onRun, onStatus }) {
   ]);
   render(seen, dispositionsPanel(run) || []);
 
+  const ruleDiagnostics = run.rule_diagnostics || [];
   render(diagnostics, [
     el('h2', { text: 'Diagnostics' }),
     diagnosticTable(run.diagnostics),
     run.summary.analysis_complete === false
       ? el('p', { class: 'alert alert--warn', text: `This analysis is partial: ${(run.summary.partial_reasons || []).join('; ')}` })
+      : null,
+    ruleDiagnostics.length
+      ? el('div', {}, [
+          el('h3', { text: 'Rule diagnostics' }),
+          el('p', { class: 'hint', text: 'Reported by the rule loader for the rule set this run used. A rule file with errors is never used: the analysis is refused instead.' }),
+          diagnosticTable(ruleDiagnostics),
+        ])
       : null,
   ]);
   return container;
@@ -157,15 +165,24 @@ export function renderAnalyze(container, { state, onRun, onStatus }) {
 export async function openExamplePicker({ onPick }) {
   const root = document.getElementById('modal-root');
   const list = el('div', {}, el('p', { class: 'spinner-wrapper' }, [el('span', { class: 'spinner' }), ' loading examples…']));
-  const close = () => render(root, []);
+  const close = () => {
+    if (typeof document.removeEventListener === 'function') document.removeEventListener('keydown', onKey);
+    render(root, []);
+  };
+  const onKey = (event) => {
+    if (event.key === 'Escape') close();
+  };
+  document.addEventListener('keydown', onKey);
+  const closeButton = el('button', { type: 'button', class: 'button button--small', text: 'Close', on: { click: close } });
   const modal = el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Load a bundled example' }, [
     el('div', { class: 'row row--between' }, [
       el('h2', { text: 'Bundled examples' }),
-      el('button', { type: 'button', class: 'button button--small', text: 'Close', on: { click: close } }),
+      closeButton,
     ]),
     list,
   ]);
   render(root, el('div', { class: 'modal-backdrop', on: { click: (event) => { if (event.target.classList.contains('modal-backdrop')) close(); } } }, modal));
+  if (typeof closeButton.focus === 'function') closeButton.focus();
   try {
     const payload = await api.examples();
     const categories = [...new Set(payload.examples.map((entry) => entry.category))].sort();
@@ -194,11 +211,20 @@ export async function runAnalysis(container, { filename, source, parserMode, use
   button.disabled = true;
   render(status, [el('span', { class: 'spinner' }), ' analysing…']);
   try {
-    const payload = { source, filename, parser_mode: parserMode };
-    if (!useBuiltin) payload.use_builtin_rules = false;
+    // The options are sent exactly as shown: the built-in toggle, the parser
+    // mode and the dependency-graph checkbox all reach the engine.  (The
+    // checkbox once built a payload field nothing read, so unchecking it
+    // silently analysed with the graph anyway.)
+    const payload = {
+      source,
+      filename,
+      parser_mode: parserMode,
+      use_builtin_rules: Boolean(useBuiltin),
+      run_dependencies: Boolean(runDependencies),
+    };
     if (customRules && customRules.trim()) payload.rules = customRules;
     const run = await api.analyze(payload);
-    update({ run, source });
+    resetForNewRun(run, source);
     render(status, el('span', { text: `Analysed ${run.filename} in ${run.total_analysis_seconds} s.` }));
     return run;
   } catch (error) {

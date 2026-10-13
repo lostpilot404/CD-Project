@@ -229,7 +229,9 @@ test('the data-flow view shows both equations and the block states', async () =>
   analysis.value = 'liveness';
   analysis.dispatchEvent({ type: 'change', target: analysis });
   await waitFor(
-    () => page.document.getElementById('dataflow-body').textContent.includes('Live variables'),
+    // 'Live variables in …' is the analysis heading; the bare words also label
+    // the selected-statement panel below the tables.
+    () => page.document.getElementById('dataflow-body').textContent.includes('Live variables in '),
     'the liveness table',
   );
   assert.match(
@@ -520,4 +522,275 @@ test('a run whose only sink call was cleared by a validator says so, and names i
   const findingsText = viewText('findings');
   assert.match(findingsText, /not that the program is safe/);
   assert.match(findingsText, /inspected and not reported/);
+});
+
+test('a re-analysis drops the previous run’s graphs, tables and slices', async () => {
+  // Regression: the graph, data-flow and slicing pages only fetched when their
+  // `data` was empty, and a new analysis never emptied it — so every page kept
+  // showing the previous run’s results after a re-analysis.
+  const { state } = await import('../js/state.js');
+  await go('graph');
+  await waitFor(() => page.document.getElementById('graph-canvas').querySelector('svg'), 'the first graph', 20000);
+  await go('dataflow');
+  await waitFor(
+    () => page.document.getElementById('dataflow-body').textContent.includes('Basic blocks'),
+    'the first data-flow table',
+    20000,
+  );
+  await go('slicing');
+  await waitFor(
+    () => page.document.getElementById('slicing-body').textContent.includes('slice ('),
+    'the first slice',
+    20000,
+  );
+  assert.ok(state.graph.data, 'the graph page fetched for the guarded run');
+  assert.ok(state.dataflow.data, 'the data-flow page fetched for the guarded run');
+  assert.ok(state.slicing.data, 'the slicing page fetched for the guarded run');
+
+  await go('analyze');
+  page.document.getElementById('source-input').value = PROGRAM;
+  page.document.getElementById('filename-input').value = 'restale.ctc';
+  page.document.getElementById('use-builtin').checked = true;
+  page.document.getElementById('run-dependencies').checked = true;
+  page.document.getElementById('analyze-button').click();
+  await waitFor(
+    () => {
+      const text = page.document.getElementById('analyze-status').textContent;
+      return text.includes('restale.ctc') && text.includes('run ');
+    },
+    'the re-analysis to finish',
+    30000,
+  );
+  assert.equal(state.run.findings.length, 2, 'the new run reported both flows');
+  assert.equal(state.graph.data, null, 'the old graph is gone');
+  assert.equal(state.dataflow.data, null, 'the old data-flow table is gone');
+  assert.equal(state.slicing.data, null, 'the old slice is gone');
+  assert.equal(state.statementDetail, null, 'the old statement detail is gone');
+  assert.equal(state.selectedFinding, null, 'no finding of the old run stays selected');
+  assert.equal(state.comparison, null, 'a comparison of older runs does not survive');
+
+  // And the pages fetch the new run’s artefacts instead of reusing the old ones.
+  await go('graph');
+  const canvas = page.document.getElementById('graph-canvas');
+  await waitFor(() => canvas.querySelector('svg'), 'the new graph', 20000);
+  const nodes = canvas.querySelectorAll('g').filter((group) => group.getAttribute('aria-label'));
+  assert.equal(nodes.length, state.graph.data.nodes.length, 'the canvas shows the new run’s graph');
+  assert.ok(state.graph.data.nodes.length > 0);
+});
+
+test('finding actions open the finding itself in the graph and slicing pages', async () => {
+  // Regression: “Show in Program Graph” and “Security slice of this finding”
+  // fetched their artefact without repainting, so the destination page kept
+  // showing its previous content (or a spinner that never stopped).
+  const { state } = await import('../js/state.js');
+  await go('findings');
+  await waitFor(
+    () => page.document.getElementById('findings-toolbar').textContent.includes('2 of 2 finding'),
+    'the findings list',
+  );
+  const card = page.document.querySelectorAll('#findings-list .finding-card__select')[0];
+  card.click();
+  const detail = page.document.getElementById('finding-detail');
+  await waitFor(() => detail.querySelectorAll('.evidence-path li').length >= 5, 'the evidence path');
+  const findingId = state.selectedFinding;
+  assert.ok(findingId, 'a finding is selected');
+
+  const buttons = () => page.document.querySelectorAll('#finding-detail button');
+  buttons().find((button) => button.textContent.includes('Show in Program Graph')).click();
+  await waitFor(() => page.window.location.hash === '#/graph', 'the navigation to the graph page');
+  await waitFor(
+    () => page.document.getElementById('graph-canvas').querySelector('svg'),
+    'the finding subgraph',
+    20000,
+  );
+  assert.equal(state.graph.focus, findingId, 'the graph is focused on the finding');
+  assert.ok(
+    state.graph.data.nodes.every((node) => node.kind === 'function' || node.id.startsWith('s')),
+    'the subgraph holds the finding’s statements and the called functions',
+  );
+
+  await go('findings');
+  await waitFor(() => detail.querySelectorAll('.evidence-path li').length >= 5, 'the evidence path again');
+  buttons().find((button) => button.textContent.includes('Security slice of this finding')).click();
+  await waitFor(() => page.window.location.hash === '#/slicing', 'the navigation to the slicing page');
+  await waitFor(
+    () => page.document.getElementById('slicing-body').textContent.includes('security slice'),
+    'the security slice',
+    20000,
+  );
+  assert.equal(state.slicing.source, 'finding');
+  assert.equal(state.slicing.data.finding_id, findingId);
+});
+
+test('filter controls survive typing and the sort control has no duplicate', async () => {
+  // Regression: every keystroke in the search box rebuilt the whole toolbar,
+  // destroying the focused input; and the sort control offered “severity”
+  // twice (once as a mislabelled “all” option).
+  await go('findings');
+  await waitFor(
+    () => page.document.getElementById('findings-toolbar').textContent.includes('2 of 2 finding'),
+    'the findings list',
+  );
+  const search = page.document.querySelectorAll('#findings-toolbar input')[0];
+  assert.ok(search, 'the search box exists');
+  search.value = 'zzz-no-such-finding';
+  search.dispatchEvent({ type: 'input', target: search });
+  await waitFor(
+    () => page.document.getElementById('findings-list').textContent.includes('No finding matches the current filters'),
+    'the filtered empty state',
+  );
+  const again = page.document.querySelectorAll('#findings-toolbar input')[0];
+  assert.equal(again, search, 'the search box is the same element: typing did not rebuild the toolbar');
+  assert.equal(
+    page.document.getElementById('findings-toolbar').textContent.includes('0 of 2 finding'),
+    true,
+    'the count line still updates while the controls stay put',
+  );
+  search.value = '';
+  search.dispatchEvent({ type: 'input', target: search });
+  await waitFor(
+    () => page.document.getElementById('findings-toolbar').textContent.includes('2 of 2 finding'),
+    'the unfiltered list',
+  );
+
+  const sort = page.document.querySelectorAll('#findings-toolbar select')
+    .find((select) => select.children.some((option) => option.getAttribute('value') === 'line'));
+  assert.ok(sort, 'the sort control exists');
+  assert.deepEqual(
+    sort.children.map((option) => option.getAttribute('value')),
+    ['severity', 'line', 'rule', 'category', 'certainty'],
+    'each sort key is offered exactly once',
+  );
+});
+
+test('a statement click shows the statement’s results on every analysis page', async () => {
+  // Regression: the data-flow and slicing pages fetched a statement’s results
+  // when one of their id buttons was clicked, then displayed nothing — only
+  // the graph page had a panel for them.
+  await go('dataflow');
+  const body = page.document.getElementById('dataflow-body');
+  await waitFor(() => body.textContent.includes('Basic blocks'), 'the data-flow table', 20000);
+  const statementButton = body.querySelectorAll('button')[0];
+  assert.ok(statementButton, 'per-statement rows offer their id as a button');
+  statementButton.click();
+  await waitFor(
+    () => page.document.getElementById('dataflow-body').textContent.includes('Taint before this statement'),
+    'the statement panel on the data-flow page',
+    20000,
+  );
+
+  // Clear the selection first so the slicing page must earn its own panel.
+  const { update } = await import('../js/state.js');
+  update({ statementDetail: null, selectedStatement: null });
+  await go('slicing');
+  const sliceBody = page.document.getElementById('slicing-body');
+  await waitFor(() => sliceBody.textContent.includes('slice ('), 'a computed slice', 20000);
+  assert.equal(
+    sliceBody.textContent.includes('Taint before this statement'),
+    false,
+    'no statement panel before a statement is clicked',
+  );
+  const sliceButton = sliceBody.querySelectorAll('button')[0];
+  assert.ok(sliceButton, 'slice rows offer their statement id as a button');
+  sliceButton.click();
+  await waitFor(
+    () => page.document.getElementById('slicing-body').textContent.includes('Taint before this statement'),
+    'the statement panel on the slicing page',
+    20000,
+  );
+});
+
+test('disabling the dependency graph keeps findings but says the graph is unavailable', async () => {
+  // Regression: the “Build the program dependency graph and slices” checkbox
+  // built a payload field nothing read, so unchecking it changed nothing.
+  const { state } = await import('../js/state.js');
+  await go('analyze');
+  page.document.getElementById('source-input').value = PROGRAM;
+  page.document.getElementById('filename-input').value = 'nodeps-ui.ctc';
+  page.document.getElementById('use-builtin').checked = true;
+  page.document.getElementById('run-dependencies').checked = false;
+  page.document.getElementById('analyze-button').click();
+  await waitFor(
+    () => {
+      const text = page.document.getElementById('analyze-status').textContent;
+      return text.includes('nodeps-ui.ctc') && text.includes('run ');
+    },
+    'the graph-less analysis to finish',
+    30000,
+  );
+  assert.equal(state.run.findings.length, 2, 'taint findings need no dependency graph');
+  assert.equal(state.run.summary.dependencies_built, false);
+  assert.equal(state.run.summary.slicing_available, false);
+
+  await go('graph');
+  await waitFor(
+    () => page.document.getElementById('graph-canvas').textContent.includes('was not built for this run'),
+    'the graph unavailable message',
+  );
+  assert.equal(page.document.getElementById('global-error').hidden, true, 'no error banner for a chosen option');
+
+  await go('slicing');
+  await waitFor(
+    () => page.document.getElementById('slicing-body').textContent.includes('Slices were not built for this run'),
+    'the slicing unavailable message',
+  );
+
+  // The analyses that do not need the graph are unaffected.
+  await go('dataflow');
+  await waitFor(
+    () => page.document.getElementById('dataflow-body').textContent.includes('Basic blocks'),
+    'the data-flow table without a graph',
+    20000,
+  );
+  await go('findings');
+  await waitFor(
+    () => page.document.getElementById('findings-toolbar').textContent.includes('2 of 2 finding'),
+    'the findings list without a graph',
+  );
+});
+
+test('the graph view draws one control-flow graph per function', async () => {
+  // The mode used to punt to the Data-Flow Analysis page, which shows tables
+  // but draws nothing — so no page drew a control-flow graph at all.
+  const { state, update } = await import('../js/state.js');
+  update({ statementDetail: null, selectedStatement: null });
+  await go('graph');
+  const selects = () => page.document.querySelectorAll('#graph-toolbar select');
+  assert.ok(selects().length >= 1, 'the graph selector exists');
+  selects()[0].value = 'cfg';
+  selects()[0].dispatchEvent({ type: 'change', target: selects()[0] });
+  const canvas = page.document.getElementById('graph-canvas');
+  await waitFor(() => canvas.querySelector('svg'), 'the control-flow graph', 20000);
+  const nodes = canvas.querySelectorAll('g').filter((group) => group.getAttribute('aria-label'));
+  assert.equal(nodes.length, state.graph.data.nodes.length, 'one group per returned block');
+  assert.ok(nodes.every((node) => node.getAttribute('aria-label').startsWith('block ')));
+  assert.match(canvas.textContent, /Control-flow graph of build_command\(\)/);
+  assert.match(
+    page.document.getElementById('graph-side').textContent,
+    /loop-back/,
+    'the side panel legends the CFG edge kinds',
+  );
+
+  // The function selector redraws the graph for the other function.
+  const fnSelect = selects().find((select) =>
+    select.children.some((option) => option.getAttribute('value') === 'main'));
+  assert.ok(fnSelect, 'a function selector is offered in CFG mode');
+  fnSelect.value = 'main';
+  fnSelect.dispatchEvent({ type: 'change', target: fnSelect });
+  await waitFor(
+    () => page.document.getElementById('graph-canvas').textContent.includes('Control-flow graph of main()'),
+    'the second function’s graph',
+    20000,
+  );
+
+  // Clicking a block selects the statement the block starts with.
+  const block = page.document.getElementById('graph-canvas').querySelectorAll('g')
+    .find((group) => (group.getAttribute('aria-label') || '').startsWith('block '));
+  assert.ok(block, 'blocks are drawn as selectable nodes');
+  block.click();
+  await waitFor(
+    () => page.document.getElementById('graph-side').textContent.includes('Reaching definitions'),
+    'the block’s first statement in the side panel',
+    20000,
+  );
 });

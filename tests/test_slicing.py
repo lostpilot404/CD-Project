@@ -258,6 +258,20 @@ class SlicingTests(unittest.TestCase):
             self.assertIn(edge["src"] if "src" in edge else edge["from"], node_ids)
             self.assertIn(edge["to"], node_ids)
 
+    def test_disabling_slices_leaves_no_slice_engine_behind(self):
+        # Regression: ``run_slicing=False`` was accepted but never read, so a
+        # findings-only run still built the slice engine.
+        program = analyse(SLICE_SOURCE, filename="noslice.ctc", run_slicing=False)
+        self.assertIsNone(program.slicing)
+        self.assertIsNotNone(program.dependencies, "the graph itself is still built")
+        self.assertTrue(program.findings, "findings never depend on the slices")
+
+    def test_disabling_the_graph_disables_the_slices_traversing_it(self):
+        program = analyse(SLICE_SOURCE, filename="nodeps.ctc", run_dependencies=False)
+        self.assertIsNone(program.dependencies)
+        self.assertIsNone(program.slicing)
+        self.assertTrue(program.findings, "findings never depend on the graph")
+
     def test_slice_kinds_and_limits_are_documented_constants(self):
         self.assertEqual(
             set(SLICE_KINDS),

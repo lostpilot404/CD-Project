@@ -14,10 +14,12 @@ const DOCUMENTS = [
   ['docs/LANGUAGE.md', 'the CT-C subset: grammar, types, statements, unsupported constructs'],
   ['docs/RULE_LANGUAGE.md', 'the declarative rule language and its grammar'],
   ['docs/API.md', 'HTTP endpoints, request and response schemas, limits'],
+  ['docs/REPORT_SCHEMA.md', 'the exported report: keys, finding fields, path steps, stability rules'],
   ['docs/EVALUATION.md', 'how the labelled corpus was built and what the measured numbers mean'],
   ['docs/LIMITATIONS.md', 'what the tool does not do, and the threat model of the tool itself'],
   ['docs/USER_GUIDE.md', 'running the app, using the interface, reading findings'],
   ['docs/PRESENTATION.md', 'presentation outline and viva questions'],
+  ['docs/FINAL_REPORT.md', 'the completion report: what was built and the evidence for each claim'],
 ];
 
 export function renderDocs(container, { language, grammar }) {

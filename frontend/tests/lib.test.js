@@ -24,6 +24,8 @@ import {
 } from '../js/lib/filter.js';
 import { computeLayers, layoutGraph, selectEdges, shortenLabel } from '../js/lib/layout.js';
 import { EDGE_LEGEND, renderGraph, renderLegend } from '../js/graph.js';
+import { renderStatementDetail } from '../js/views/statement.js';
+import { cfgToGraph } from '../js/views/graph.js';
 
 const { document } = installDocument('<html><body></body></html>');
 globalThis.document = document;
@@ -234,6 +236,64 @@ test('graph.js legend describes every drawn edge kind', () => {
     assert.ok(text.includes(kind), `legend mentions ${kind}`);
   }
   assert.equal(EDGE_LEGEND.length, 7);
+});
+
+test('views/statement.js renders the engine’s statement record, and nothing as markup', () => {
+  const hostile = 'system("<img src=x onerror=alert(1)>");';
+  const panel = renderStatementDetail({
+    sid: 3,
+    line: 9,
+    col: 3,
+    function: 'main',
+    block: 2,
+    kind: 'ExprStmt',
+    text: hostile,
+    reaching_definitions: [{ symbol: 'cmd', line: 7, kind: 'assignment' }],
+    live_variables: { in: ['cmd'], out: [] },
+    taint: [{ symbol: 'cmd', atoms: ['src:stdin@command'] }],
+    control_dependencies: [],
+  });
+  assert.match(panel.textContent, /Reaching definitions/);
+  assert.match(panel.textContent, /Live variables/);
+  assert.match(panel.textContent, /Taint before this statement/);
+  assert.match(panel.textContent, /Control dependencies/);
+  assert.match(panel.textContent, /cmd defined at line 7/);
+  assert.match(panel.textContent, /src:stdin@command/);
+  const code = panel.querySelector('pre');
+  assert.equal(code.textContent, hostile);
+  assert.equal(code.children.length, 0, 'statement text is text, never markup');
+
+  const empty = renderStatementDetail(null);
+  assert.match(empty.textContent, /Select a statement/);
+});
+
+test('views/graph.js converts one CFG into drawable blocks and typed edges', () => {
+  const cfg = {
+    function: 'main',
+    blocks: [
+      {
+        id: 0, kind: 'entry', statement_ids: [1, 2],
+        statements: [{ sid: 1, line: 2 }, { sid: 2, line: 3 }],
+        successors: [{ from: 0, to: 1, kind: 'true', label: 'true', condition: 'n > 1' }],
+      },
+      {
+        id: 1, kind: 'exit', statement_ids: [], statements: [], successors: [],
+      },
+    ],
+  };
+  const graph = cfgToGraph(cfg, { 1: 'int n = 3;', 2: 'return n;' });
+  assert.equal(graph.function, 'main');
+  assert.equal(graph.nodes.length, 2);
+  assert.equal(graph.nodes[0].id, 'b0');
+  assert.equal(graph.nodes[0].kind, 'block');
+  assert.match(graph.nodes[0].label, /B0 · entry/);
+  assert.match(graph.nodes[0].label, /int n = 3;/);
+  assert.equal(graph.nodes[0].line, 2);
+  assert.equal(graph.nodes[0].sid, 1, 'clicking a block selects its first statement');
+  assert.equal(graph.nodes[1].sid, -1, 'a block without statements selects nothing');
+  assert.deepEqual(graph.edges, [{
+    from: 'b0', to: 'b1', kind: 'true', family: 'true', reason: 'n > 1',
+  }]);
 });
 
 test('renderGraph handles missing node positions without throwing', () => {

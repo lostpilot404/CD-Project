@@ -25,12 +25,12 @@ schemas below; this document explains the semantics and the limits.
 
 | Status | Codes |
 | --- | --- |
-| 400 | `missing-source`, `invalid-source`, `invalid-filename`, `invalid-parser-mode`, `missing-rules`, `invalid-format`, `unknown-analysis`, `missing-parameter`, `invalid-parameter`, `invalid-json` |
+| 400 | `missing-source`, `invalid-filename`, `invalid-parser-mode`, `missing-rules`, `invalid-format`, `unknown-analysis`, `missing-parameter`, `invalid-parameter`, `invalid-json` |
 | 403 | `path-not-allowed` |
 | 404 | `not-found`, `example-not-found`, `run-not-found`, `finding-not-found`, `statement-not-found`, `function-not-found` |
-| 409 | `graph-unavailable`, `slicing-unavailable` |
-| 413 | `body-too-large`, `source-too-large`, `rules-too-large` |
-| 422 | `invalid-rules` (detail lists code, line and message), `input-too-deep` |
+| 409 | `graph-unavailable`, `slicing-unavailable` (the run was analysed with `run_dependencies: false`) |
+| 413 | `payload-too-large`, `source-too-large`, `rules-too-large` |
+| 422 | `invalid-rules` (detail lists code, line and message), `input-too-deep`, `analysis-rejected` (the source broke a documented analysis limit) |
 | 500 | `internal-error` (message is generic; the traceback goes to the server log only) |
 
 ## 2. Metadata endpoints
@@ -57,8 +57,9 @@ diagnostics catalogue (`code`, `phase`, `meaning`).
 `nullable`, `first`, `follow` (all terminal-only), the numbered production list
 (`display` + `label`), automaton statistics (states, transitions, items,
 `lr1_states_before_merge`, build seconds) and the action/goto entry counts plus
-the conflict list. `lalr` is the default and the only mode the analysis pipeline
-uses; the other two exist to demonstrate the constructions.
+the conflict list. `lalr` is the default; `/api/analyze` accepts any of the three
+modes through `parser_mode` (the grammar is conflict-free in all of them, so all
+three accept the same language — the tables just differ in size).
 
 ### `GET /api/rules`
 
@@ -87,9 +88,10 @@ Request (`AnalysisRequest`):
 | Field | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `source` | string | required | CT-C source, ≤ 512 KiB |
-| `filename` | string | `<source>` | shown in reports; must not contain a path separator |
+| `filename` | string | `<source>` | display name for reports and diagnostics, ≤ 200 chars; never used as a filesystem path |
 | `rules` | string | absent | rule file text, validated first; a broken file is `422` |
-| `use_builtin_rules` | boolean | `true` | `false` analyses with the submitted rules alone |
+| `use_builtin_rules` | boolean | `true` | `false` analyses with the submitted rules alone — or with no rules at all when no file is submitted |
+| `run_dependencies` | boolean | `true` | `false` skips the dependency graph and the slices; findings are unaffected, but `/graph` and `/slice` then answer `409` |
 | `parser_mode` | enum | `lalr` | `lalr`, `slr` or `canonical` |
 
 Response (`AnalysisResponse`):
@@ -123,7 +125,9 @@ Response (`AnalysisResponse`):
 The embedded `findings` omit the full `path` (it is large); fetch
 `/api/runs/{run_id}/findings/{finding_id}` for the evidence path. `metrics` never
 contains invented values: every number is counted during the run, and `timings`
-is wall clock for this process.
+is wall clock for this process. `summary.dependencies_built` and
+`summary.slicing_available` state whether the run has a dependency graph and a
+slice engine (`false` exactly when the request set `run_dependencies: false`).
 
 ## 4. Run endpoints
 
@@ -196,10 +200,11 @@ derived from the flow, not from line numbers, so a formatting change reports
 
 | Limit | Value | Behaviour when exceeded |
 | --- | --- | --- |
-| request body | 1 100 000 bytes | `413 body-too-large` |
+| request body | 1 100 000 bytes | `413 payload-too-large` |
 | source size | 524 288 bytes | `413 source-too-large` |
 | rule file size | 524 288 bytes | `413 rules-too-large` |
-| `sid` | 0 … 1999 | `400 invalid-parameter` |
+| unknown statement id | — | `404 statement-not-found` (`/statements/{sid}`); a non-integer `sid` is `400 invalid-parameter` |
+| statement index in the analyse response | first 2000 statements | the list is truncated; every statement stays addressable by `sid` |
 | graph payload | `limit` ≤ 4000 nodes/edges | `truncated: true` in the payload |
 | slice size | 5000 statements, 500 edges | `truncated: true`, note in the slice |
 | data-flow fixpoint | 10 000 iterations / 200 000 steps | `converged: false` and a partial-analysis note |

@@ -24,6 +24,16 @@ function select(label, options, value, onChange, allLabel) {
   ]);
 }
 
+function sortSelect(current, onSort) {
+  const options = ['severity', 'line', 'rule', 'category', 'certainty'];
+  return el('label', { class: 'field' }, [
+    el('span', { text: 'Sort by' }),
+    el('select', {
+      on: { change: (event) => onSort(event.target.value) },
+    }, options.map((option) => el('option', { value: option, text: option, selected: option === current }))),
+  ]);
+}
+
 export function renderToolbar(container, { state, onFilter, onSort, findings }) {
   const filters = state.filters;
   render(container, el('div', { class: 'row row--wrap' }, [
@@ -40,7 +50,7 @@ export function renderToolbar(container, { state, onFilter, onSort, findings }) 
           class: 'hint',
           text: 'Compare two runs on the Reports page to filter findings by fixed/open.',
         }),
-    select('Sort by', ['severity', 'line', 'rule', 'category', 'certainty'], state.sort, onSort, 'severity'),
+    sortSelect(state.sort || 'severity', onSort),
     el('label', { class: 'field' }, [
       el('span', { text: 'Search' }),
       el('input', {
@@ -146,11 +156,14 @@ export function renderFindingDetail(container, { finding, detail, source, onShow
     el('h3', { text: 'Remediation' }),
     el('p', { text: record.remediation }),
     el('h3', { text: 'Source context' }),
+    // Read-only here: a line number is not a statement id, so clicking a line
+    // cannot select the statement behind it, and this page has no statement
+    // panel to show it in.  (The handler once treated the line number as a
+    // statement id and fetched the wrong statement, invisibly.)
     renderSource(source, {
       highlightLines: pathLines,
       selectedLine: record.sink.line,
       severityByLine: severityByLine([record]),
-      onLineClick: onSelectStatement,
       maxLines: 2000,
     }),
     el('div', { class: 'row' }, [
@@ -182,6 +195,7 @@ export async function renderFindings(container, { state, onFilter, onSort, onSel
 
   if (!run) {
     render(toolbar, []);
+    toolbar.dataset.controlsKey = '';
     render(listNode, el('p', { class: 'empty-state', text: 'No analysis has run yet. Use “Analyze Code” first.' }));
     render(detailNode, []);
     return;
@@ -192,15 +206,30 @@ export async function renderFindings(container, { state, onFilter, onSort, onSel
       || (state.comparison.resolved || []).map((finding) => finding.id))) || [],
   );
   const filtered = sortFindings(filterFindings(run.findings, state.filters, { resolvedIds }), state.sort);
-  render(toolbar, [
-    el('div', { class: 'row row--between' }, [
-      el('strong', { text: `${filtered.length} of ${run.findings.length} finding(s)` }),
-      el('span', { class: 'hint', text: 'Findings are ordered and filtered here; the analysis itself is not recomputed.' }),
-    ]),
+  // The count line is cheap to repaint, but the controls are not: rebuilding
+  // them on every keystroke in the search box would destroy the focused input
+  // and drop each second character.  The controls only depend on the run and
+  // on whether a comparison exists, so they are rebuilt only when those change
+  // and the count line is repainted every time.
+  const controlsKey = `${run.run_id}|${state.comparison ? 'compared' : 'single'}`;
+  let count = toolbar.querySelector('.findings-count');
+  if (!count) {
+    render(toolbar, []);
+    count = el('div', { class: 'row row--between findings-count' });
+    toolbar.appendChild(count);
+  }
+  render(count, [
+    el('strong', { text: `${filtered.length} of ${run.findings.length} finding(s)` }),
+    el('span', { class: 'hint', text: 'Findings are ordered and filtered here; the analysis itself is not recomputed.' }),
   ]);
-  const controls = el('div');
-  renderToolbar(controls, { state, onFilter, onSort, findings: run.findings });
-  toolbar.appendChild(controls);
+  if (toolbar.dataset.controlsKey !== controlsKey) {
+    const previous = toolbar.querySelector('.findings-controls');
+    if (previous) toolbar.removeChild(previous);
+    const controls = el('div', { class: 'findings-controls' });
+    renderToolbar(controls, { state, onFilter, onSort, findings: run.findings });
+    toolbar.appendChild(controls);
+    toolbar.dataset.controlsKey = controlsKey;
+  }
 
   if (!run.findings.length) {
     render(listNode, el('p', {

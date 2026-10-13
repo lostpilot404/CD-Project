@@ -359,7 +359,13 @@ def analyse_source(
     )
 
     slice_started = time.perf_counter()
-    program.slicing = SliceEngine(program)
+    # Slices are traversals of the dependency graph, so there is nothing to
+    # traverse when the graph was not built.  ``run_slicing=False`` skips the
+    # slice engine even when the graph exists (findings-only runs).
+    if run_slicing and run_dependencies:
+        program.slicing = SliceEngine(program)
+    else:
+        program.slicing = None
     timings["slicing_setup_seconds"] = round(time.perf_counter() - slice_started, 6)
 
     # -- findings ---------------------------------------------------------

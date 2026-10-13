@@ -629,8 +629,16 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
         if parser_mode not in ("lalr", "slr", "canonical"):
             raise ApiError(400, "invalid-parser-mode",
                            "parser_mode must be one of lalr, slr, canonical")
+        use_builtin = payload.get("use_builtin_rules", True)
+        if not isinstance(use_builtin, bool):
+            raise ApiError(400, "invalid-parameter",
+                           "'use_builtin_rules' must be a boolean")
+        run_dependencies = payload.get("run_dependencies", True)
+        if not isinstance(run_dependencies, bool):
+            raise ApiError(400, "invalid-parameter",
+                           "'run_dependencies' must be a boolean")
 
-        rule_set, rule_diagnostics = self._resolve_rules(payload)
+        rule_set, rule_diagnostics = self._resolve_rules(payload, use_builtin)
 
         try:
             program = analyse_source(
@@ -638,6 +646,10 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
                 filename=filename,
                 rules=rule_set,
                 parser_mode=parser_mode,
+                # Slices traverse the dependency graph, so skipping the graph
+                # skips the slices as well; findings never depend on either.
+                run_dependencies=run_dependencies,
+                run_slicing=run_dependencies,
                 # ``_resolve_rules`` already combined the built-in and submitted
                 # rule files, so the pipeline must not merge them a second time.
                 include_builtin_rules=False,
@@ -661,12 +673,17 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
         payload_out["rule_diagnostics"] = [d.to_json() for d in rule_diagnostics]
         self._send_json(payload_out)
 
-    def _resolve_rules(self, payload: dict) -> Tuple[RuleSet, list]:
+    def _resolve_rules(self, payload: dict, use_builtin: bool = True) -> Tuple[RuleSet, list]:
         rules_text = payload.get("rules")
-        use_builtin = payload.get("use_builtin_rules", True)
         builtin, diagnostics = load_builtin_rules()
         if not isinstance(rules_text, str) or not rules_text.strip():
-            return builtin, diagnostics
+            if use_builtin:
+                return builtin, diagnostics
+            # The caller explicitly disabled the built-in rules and submitted
+            # no replacement: analyse with an empty rule set, not the built-in
+            # one.  Returning the built-in set here would silently report
+            # findings the caller asked not to look for.
+            return RuleSet(origin="no rules (built-in rules disabled)"), []
         custom, custom_diagnostics, _parsed = parse_and_validate(
             rules_text, "<submitted rules>", origin="submitted rules"
         )
@@ -754,6 +771,12 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
                 "analysis_complete": program.analysis_complete,
                 "partial_reasons": list(program.partial_reasons),
                 "analysis_converged": program.taint.converged,
+                # Whether the dependency graph and the slice engine exist for
+                # this run.  Both are skipped when the request sets
+                # ``run_dependencies`` to false; the graph and slice endpoints
+                # then answer 409 and the interface says so instead of failing.
+                "dependencies_built": program.dependencies is not None,
+                "slicing_available": program.slicing is not None,
             },
             "diagnostics": [d.to_json() for d in program.diagnostics],
             "findings": [f.to_json(include_path=False) for f in program.findings],
