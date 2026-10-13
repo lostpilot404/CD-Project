@@ -12,6 +12,9 @@
  * rendering.  Text is text; if a test asserts it, it asserts on the DOM tree.
  */
 
+/** The document most recently installed, so `focus()` can track the active element. */
+let activeDocument = null;
+
 class DomNode {
   constructor(nodeName) {
     this.nodeName = nodeName;
@@ -175,6 +178,15 @@ class DomNode {
         },
       },
     );
+  }
+
+  /** Focus tracking, mirroring the one bit of focus behaviour views rely on. */
+  focus() {
+    if (activeDocument) activeDocument.activeElement = this;
+  }
+
+  blur() {
+    if (activeDocument && activeDocument.activeElement === this) activeDocument.activeElement = null;
   }
 
   // -- events ----------------------------------------------------------
@@ -381,6 +393,7 @@ export function installDocument(html) {
 
   const document = {
     nodeType: 9,
+    activeElement: null,
     documentElement,
     head,
     body,
@@ -393,6 +406,7 @@ export function installDocument(html) {
     querySelectorAll: (selector) => documentElement.querySelectorAll(selector),
     addEventListener() {},
   };
+  activeDocument = document;
 
   const windowListeners = new Map();
   const window = {

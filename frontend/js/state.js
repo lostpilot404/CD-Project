@@ -33,6 +33,13 @@ export const state = {
   slicing: { sid: null, direction: 'backward', source: 'statement', data: null },
   /** Result of the last run comparison, if any. */
   comparison: null,
+  /** Run ids entered on the Reports page for a comparison. */
+  compareBefore: '',
+  compareAfter: '',
+  /** Statement id -> source text of the current run. */
+  statementsById: {},
+  /** Full record of the currently selected statement, if fetched. */
+  statementDetail: null,
 };
 
 export function subscribe(listener) {
@@ -46,16 +53,35 @@ export function update(patch) {
   for (const listener of [...listeners]) listener(state);
 }
 
+/**
+ * Drop every artefact derived from a run (graph, data-flow solution, slice,
+ * statement/finding details, comparison).  Views fetch these lazily only when
+ * their slot is empty, so anything left over from a previous run would be
+ * shown as if it belonged to the current one: a new analysis — and Clear —
+ * must invalidate them all, while keeping the user's view preferences
+ * (graph mode/edge kinds, data-flow analysis, slice direction).
+ */
+export function invalidateRunArtifacts() {
+  update({
+    selectedFinding: null,
+    selectedFindingDetail: null,
+    selectedStatement: null,
+    statementDetail: null,
+    comparison: null,
+    compareBefore: '',
+    compareAfter: '',
+    statementsById: {},
+    graph: { ...state.graph, data: null, focus: null },
+    dataflow: { function: null, analysis: state.dataflow.analysis, data: null },
+    slicing: { sid: null, direction: state.slicing.direction, source: 'statement', data: null },
+  });
+}
+
 export function resetRun() {
   update({
     run: null,
     source: '',
-    selectedFinding: null,
-    selectedFindingDetail: null,
-    selectedStatement: null,
-    comparison: null,
     filters: { severity: '', category: '', rule: '', certainty: '', file: '', status: '', search: '' },
-    dataflow: { function: null, analysis: 'reaching' },
-    slicing: { sid: null, direction: 'backward', source: 'statement' },
   });
+  invalidateRunArtifacts();
 }

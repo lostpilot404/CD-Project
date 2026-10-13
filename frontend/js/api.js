@@ -61,7 +61,13 @@ export const api = {
   schemas: () => request('api/schemas'),
   rules: () => request('api/rules'),
   examples: () => request('api/examples'),
-  example: (id) => request(`api/examples/${id}`),
+  // Example ids are paths (`vulnerable/command_injection.ctc`): encode each
+  // segment so names with spaces or other reserved characters still resolve,
+  // while keeping the slashes the API routes on.
+  example: (id) => {
+    const path = String(id).split('/').map(encodeURIComponent).join('/');
+    return request(`api/examples/${path}`);
+  },
   analyze: (payload) => request('api/analyze', { method: 'POST', body: payload, timeoutMs: 60000 }),
   validateRules: (rules) => request('api/rules/validate', { method: 'POST', body: { rules } }),
   run: (id) => request(`api/runs/${id}`),
