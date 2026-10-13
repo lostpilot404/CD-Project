@@ -65,7 +65,7 @@ the port before the audience arrives; if the port is busy the engine says so.
 9. Close on **Documentation** — the language subset, the diagnostic catalogue and
    the document list, all served by the engine.
 
-Fallback if something misbehaves live: `python3 scripts/audit.py` prints 54
+Fallback if something misbehaves live: `python3 scripts/audit.py` prints 68
 independent checks (grammar, hand-computed data flow, graph, slices, rules, HTTP
 workflow, malformed input, the interface contract, document accuracy) and each
 line states what it observed.
@@ -78,7 +78,8 @@ line states what it observed.
 | Tables | 167 states in LALR and SLR, 656 canonical LR(1) states, 0 conflicts in all three modes | same |
 | Rule language | 40 productions, 78 states, 0 conflicts | `/api/rules` |
 | Tests | 256 engine tests + 27 interface tests | `python3 -m unittest discover -s tests -t .`, `cd frontend && npm test` |
-| Audit | 54 checks | `python3 scripts/audit.py` |
+| Audit | 68 checks | `python3 scripts/audit.py` |
+| Mutation check | 18/18 deliberate defects caught | `python3 scripts/mutation_check.py` |
 | Corpus | 29 labelled files, 17 expected findings, TP 17 / FP 0 / FN 0, TN 8/8, P = R = F1 = 1.0 | `scripts/evaluate.sh` |
 | Speed | whole corpus in 0.81 s; median 7 ms per file; first file 0.60 s (table build included) | `scripts/evaluate.sh` |
 | Dependencies | none (Python 3.11 standard library only) | `ls requirements.txt` (absent) |

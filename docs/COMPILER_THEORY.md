@@ -747,7 +747,7 @@ With a helper (`build_command(name)` returning `"ls " + name`), the path gains a
 `interprocedural: true` with the context-insensitivity limitation attached.
 
 **Implementation / tests / limits.** `codetrace/analysis/taint.py`,
-`codetrace/findings/explain.py`; `tests/test_taint.py` (36 tests: positives,
+`codetrace/findings/explain.py`; `tests/test_taint.py` (40 tests: positives,
 negatives, sanitiser contexts and argument indices, unknown calls, branches,
 recursion, custom rules). Limits: context-insensitive summaries (documented in
 `docs/LIMITATIONS.md`), no path-sensitivity beyond the guard rules, no array or

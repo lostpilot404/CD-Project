@@ -221,6 +221,17 @@ scripts/tests.sh                               # the above plus the frontend sui
 python3 evaluation/run_evaluation.py           # labelled corpus, table on stdout
 scripts/evaluate.sh                            # same, JSON written to var/
 python3 scripts/audit.py -v                    # independent end-to-end audit
+python3 scripts/mutation_check.py              # break the engine on purpose, 18 mutations
+python3 scripts/mutation_check.py --list       # the catalogue, without rewriting anything
 ```
 
 No command needs network access, a key or a service account.
+
+`mutation_check.py` is the check on the checks: for each of the 18 catalogue
+entries it asserts the anchor still matches exactly once, applies the defect,
+runs the test modules that are supposed to notice it, restores the file
+byte-for-byte, and fails if any defect escapes the suite. It refuses to start
+when a target file has uncommitted changes, so an interrupted run cannot lose
+work, and it records mutations it deliberately does *not* include when they turn
+out to be behaviourally equivalent (`SLICE_KINDS` already names every edge kind
+the graph defines, so widening it to "all kinds" changes nothing).

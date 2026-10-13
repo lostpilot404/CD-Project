@@ -122,8 +122,10 @@ compound argument), plus the suite in
 ## 3. What the harness measures
 
 **Finding level** — an expectation is satisfied when a reported finding agrees on
-the rule id, the category and the normalised text of the sink statement (line
-numbers are compared too, but they are not the identity):
+the rule id, the category, the severity, the source rule, the certainty (where the
+expectation declares one) and the normalised text of the sink statement. Line
+numbers are recorded in the expectation for readability and are **not** part of
+the match, so moving a sink down a line does not fail a case:
 
 ```
 TP = expectations satisfied by a distinct reported finding

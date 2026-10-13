@@ -34,11 +34,13 @@ No third-party package is needed anywhere in the pipeline: there is no
 `requirements.txt` because there are no requirements beyond Python 3.11.
 
 ```bash
-scripts/tests.sh              # every suite: engine, API, reporting, workflow, interface
-scripts/tests.sh engine       # Python suites only (no Node needed)
-scripts/evaluate.sh           # the labelled corpus, JSON evidence in var/
-python3 scripts/audit.py      # independent Definition-of-Done audit (54 checks)
-python3 scripts/audit.py -v   # ... printing the value behind every check
+scripts/tests.sh                 # every suite: engine, API, reporting, workflow, interface
+scripts/tests.sh engine          # Python suites only (no Node needed)
+scripts/evaluate.sh              # the labelled corpus, JSON evidence in var/
+python3 scripts/audit.py         # independent Definition-of-Done audit (68 checks)
+python3 scripts/audit.py -v      # ... printing the value behind every check
+python3 scripts/mutation_check.py  # break the engine on purpose: does the suite notice?
+python3 scripts/mutation_check.py --list   # the mutation catalogue, no changes made
 ```
 
 ## What it does
@@ -76,7 +78,7 @@ tests/                 engine suite: lexer, parser, semantics, CFG, data-flow,
                        taint, slicing, rules, API, reporting, end-to-end workflow
 examples/              29 labelled `.ctc` files and one example rule file
 evaluation/            harness + `expectations.json` labels for the corpus
-scripts/               serve.sh, tests.sh, evaluate.sh, audit.py
+scripts/               serve.sh, tests.sh, evaluate.sh, audit.py, mutation_check.py
 docs/                  the documentation set (below)
 ```
 
@@ -104,10 +106,11 @@ language), so the interface cannot claim more than the engine implements.
 
 | Suite | Command | Result on this checkout |
 | --- | --- | --- |
-| Engine, API, reporting, workflow | `python3 -m unittest discover -s tests -t .` | 256 tests, all passing |
-| Interface | `cd frontend && npm test` | 27 tests, all passing (real engine over HTTP, stub DOM) |
-| Labelled corpus | `scripts/evaluate.sh` | 29 files, 17 expected findings, TP 17 / FP 0 / FN 0, file-level TN 8/8, precision = recall = F1 = 1.0, 0.81 s total |
-| Independent audit | `python3 scripts/audit.py` | 54 checks covering grammar, hand-computed data flow, graph edges, slices, rules, the HTTP workflow, malformed input, the interface contract and document accuracy |
+| Engine, API, reporting, workflow | `python3 -m unittest discover -s tests -t .` | 282 tests, all passing |
+| Interface | `cd frontend && npm test` | 30 tests, all passing (real engine over HTTP, stub DOM) |
+| Labelled corpus | `scripts/evaluate.sh` | 29 files, 17 expected findings, TP 17 / FP 0 / FN 0, file-level TN 8/8, precision = recall = F1 = 1.0, ≈1.2 s total |
+| Independent audit | `python3 scripts/audit.py` | 68 checks covering grammar, hand-computed data flow, graph edges, slices, rules, the HTTP workflow, malformed input, the interface contract, document accuracy and the claims the documents make about the code |
+| Mutation check | `python3 scripts/mutation_check.py` | 18 deliberate defects (parser, semantics, CFG, data flow, taint, slicing, rules, reporting); the suite has to catch every one, and does (18/18) |
 
 The evaluation numbers describe this corpus only. See `docs/EVALUATION.md` for
 what they do and do not mean, and `docs/LIMITATIONS.md` for the analysis limits

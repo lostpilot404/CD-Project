@@ -2,7 +2,7 @@
   "corpus_version": "1.0",
   "engine_version": "1.0.0",
   "purpose": "Labelled corpus for the CodeTrace evaluation. Every case states, before the analysis is run, what the tool is expected to report. The labels are authored by hand from the source code; the harness in run_evaluation.py compares them with the actual output. Metrics computed from this file describe this corpus only.",
-  "matching": "A reported finding matches an expectation when the rule id, the category and the normalised text of the sink statement all agree. Line numbers are recorded for readability and are checked as well, but they are not the identity of a finding.",
+  "matching": "A reported finding matches an expectation when the rule id, the category, the severity, the source rule, the certainty (when the expectation declares one) and the normalised text of the sink statement all agree (finding_matches in run_evaluation.py). Line numbers are recorded for readability but are deliberately NOT part of the match, so a case still passes when an edit moves the sink down a line.",
   "cases": [
     {
       "file": "vulnerable/command_injection.ctc",

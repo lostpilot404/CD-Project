@@ -27,6 +27,8 @@ Checks
 11. the interface contract: only declared endpoints, a section per route, and
     the run summary the views read is really in the payload
 12. documentation accuracy: every path and command the documents mention exists
+13. quoted claims: the corpus accounting, the matching rule and the validator
+    guard behaviour the documents state are re-derived from the code
 """
 
 from __future__ import annotations
@@ -48,6 +50,7 @@ if ROOT not in sys.path:
 from codetrace.analysis import dependencies as dependency_module  # noqa: E402
 from codetrace.analysis.reaching_definitions import definition_atom  # noqa: E402
 from codetrace.analysis.pipeline import analyse_source  # noqa: E402
+from codetrace.reporting import json_report  # noqa: E402
 from codetrace.api.server import create_server  # noqa: E402
 from codetrace.frontend.pipeline import parser_tables  # noqa: E402
 from codetrace.rules.rule_language import parse_and_validate  # noqa: E402
@@ -607,6 +610,142 @@ def check_documentation() -> None:
     check("the project needs no third-party Python package", not third_party, third_party)
 
 
+# ---------------------------------------------------------------------------
+# 13. claims the documents make about the code
+# ---------------------------------------------------------------------------
+def check_claims() -> None:
+    """Re-derive the statements the documents make, from the code itself.
+
+    A document that describes behaviour is a claim like any other, and the ones
+    quoted in the reports and the README are the ones a reviewer will check.  The
+    checks below deliberately compute the value instead of trusting the prose.
+    """
+    section("quoted claims")
+
+    # -- the corpus accounting in docs/EVALUATION.md §2 --------------------
+    expectations_path = os.path.join(ROOT, "evaluation", "expectations.json")
+    with open(expectations_path, encoding="utf-8") as handle:
+        corpus = json.load(handle)
+    cases = corpus["cases"]
+    finding_level = [c for c in cases if c.get("expect")]
+    file_level = [c for c in cases if c["label"] in ("safe", "sanitized")]
+    diagnostic_only = [c for c in cases if c["label"] in ("unsupported", "syntax_error")]
+    declared = sum(len(c.get("expect") or []) for c in cases)
+    check(
+        "the three metric groups partition the corpus (15 + 8 + 6 = 29)",
+        (len(finding_level), len(file_level), len(diagnostic_only)) == (15, 8, 6)
+        and len(finding_level) + len(file_level) + len(diagnostic_only) == len(cases) == 29,
+        f"{len(finding_level)} finding-level + {len(file_level)} file-level + "
+        f"{len(diagnostic_only)} diagnostic-only = {len(cases)}",
+    )
+    check(
+        "the corpus declares the 17 expectations the documents quote",
+        declared == 17,
+        declared,
+    )
+    check(
+        "a file-level case declares no expectation (no case is counted twice)",
+        not [c for c in file_level if c.get("expect")],
+        [c["file"] for c in file_level if c.get("expect")],
+    )
+
+    # -- the matching rule: line numbers are not part of the match ---------
+    harness_path = os.path.join(ROOT, "evaluation", "run_evaluation.py")
+    harness_source = open(harness_path, encoding="utf-8").read()
+    matcher_body = harness_source.split("def finding_matches", 1)[1].split("\ndef ", 1)[0]
+    check(
+        "finding_matches does not consult the line number it records",
+        "line" not in matcher_body.replace("Line numbers", ""),
+        "no line comparison in finding_matches",
+    )
+    check(
+        "the corpus states that line numbers are not part of the match",
+        "NOT part of the match" in corpus.get("matching", ""),
+        corpus.get("matching", "")[:60],
+    )
+
+    catalogue = subprocess.run(
+        [sys.executable, "scripts/mutation_check.py", "--list"],
+        cwd=ROOT, capture_output=True, text=True, timeout=120,
+    )
+    entries = [line for line in catalogue.stdout.splitlines() if line.strip()]
+    check(
+        "the mutation catalogue is listed and covers the pipeline",
+        catalogue.returncode == 0 and len(entries) >= 12,
+        f"{len(entries)} mutations listed",
+    )
+    areas = {line.split()[0] for line in entries if line.strip()}
+    check(
+        "the mutation catalogue spans parser, semantics, CFG, data flow, taint, "
+        "slicing, rules and reporting",
+        {"parser", "semantics", "cfg", "dataflow", "taint", "slicing", "rules", "reporting"}
+        <= areas,
+        sorted(areas),
+    )
+
+    # -- validator guards: a suppressed flow is reported as suppressed -----
+    guarded = (
+        "int main() {\n  string name = input();\n"
+        "  if (is_safe_command(name)) { system(name); }\n  return 0;\n}\n"
+    )
+    program = analyse_source(guarded, filename="guarded.ctc")
+    suppressions = getattr(program.taint, "guard_suppressions", None) or []
+    check(
+        "a validator-guarded flow leaves a suppression record, not silence",
+        len(program.findings) == 0 and len(suppressions) == 1
+        and suppressions[0]["validator"] == "validate_command"
+        and suppressions[0]["removed_atoms"],
+        [(s["validator"], s["symbol"], s["removed_atoms"]) for s in suppressions],
+    )
+    check(
+        "the suppression states that the validator body was not analysed",
+        "assumes it rejects" in (suppressions[0]["assumption"] if suppressions else ""),
+        suppressions[0]["assumption"][:70] if suppressions else "",
+    )
+    report = json_report.build_report(program, run_id="audit-guard")
+    dispositions = report["summary"]["dispositions"]
+    check(
+        "the report exposes the guard under summary.dispositions.validator_guards",
+        [g["validator"] for g in dispositions["validator_guards"]] == ["validate_command"],
+        dispositions["validator_guards"],
+    )
+    check(
+        "the report's disposition names the guard instead of denying the taint",
+        "cleared" in dispositions["unreported_sink_calls"][0]["reason"]
+        and "no taint of the required context reached"
+        not in dispositions["unreported_sink_calls"][0]["reason"],
+        dispositions["unreported_sink_calls"][0]["reason"][:70],
+    )
+    check(
+        "the run-level limitation counts the unreported sink call",
+        any("unreported sink call" in line for line in report["limitations"]),
+        [l for l in report["limitations"] if "unreported sink call" in l][:1],
+    )
+    plain = json_report.build_report(
+        analyse_source("int main() { int a = 1; return a; }", filename="plain.ctc"),
+        run_id="audit-plain",
+    )
+    check(
+        "a run with no guard makes no suppression claim",
+        not plain["summary"]["dispositions"]["validator_guards"]
+        and not [l for l in plain["limitations"] if "unreported sink call" in l],
+        plain["summary"]["dispositions"]["validator_guards"],
+    )
+
+    # -- the must-analysis contract the documents describe -----------------
+    loop = analyse_source(
+        "int main() {\n  int n = 0;\n  for (int i = 0; i < 3; i++) {\n"
+        "    if (i == 1) { continue; }\n    n = n + i;\n  }\n  return n;\n}\n",
+        filename="loop.ctc",
+    )
+    false_positives = [d for d in loop.diagnostics if d.code == "DFA001"]
+    check(
+        "definite assignment does not report a variable assigned before the loop",
+        false_positives == [],
+        [(d.line, d.col, d.message) for d in false_positives],
+    )
+
+
 def main() -> int:
     global VERBOSE
     parser = argparse.ArgumentParser(description="independent audit of this checkout")
@@ -624,6 +763,7 @@ def main() -> int:
     check_interface()
     check_run_summary()
     check_documentation()
+    check_claims()
 
     print()
     if FAILURES:
