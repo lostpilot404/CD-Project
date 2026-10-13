@@ -379,7 +379,7 @@ async function boot() {
       ' ',
       el('span', { class: 'badge badge--muted', text: `rules ${health.rules_version}` }),
       ' ',
-      el('span', { class: 'badge badge--muted', text: `${health.grammar.states} states / ${health.grammar.conflicts} conflicts` }),
+      el('span', { class: 'badge badge--muted', text: `${health.grammar.lalr_states} states / ${health.grammar.conflicts} conflicts` }),
     ]);
     update({ health });
     showError('');

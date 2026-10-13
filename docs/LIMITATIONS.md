@@ -45,6 +45,13 @@ Consequences worth stating plainly:
   through it cannot be reported;
 * code guarded by `#ifdef` is not conditionally compiled; both branches may
   appear, and the directive itself is an unsupported construct.
+* a program with an **error-severity semantic diagnostic** (for example an
+  undeclared identifier `SEM001`, a wrong argument count `SEM009`, or a type
+  mismatch `SEM005`/`SEM010`) would not compile under C rules. The run is marked
+  partial (`analysis_complete: false`, reason "semantic error(s) were
+  reported"), because the names or values involved could not be resolved. Pinned
+  by `SymbolTableTests.test_undeclared_identifier_makes_the_run_partial` (`tests/test_semantics.py`).
+  Warnings such as shadowing (`SEM018`) do not make a run partial.
 
 ### 1.3 Analysis approximations
 
@@ -52,6 +59,8 @@ Consequences worth stating plainly:
 | --- | --- | --- |
 | **Context-insensitive interprocedural summaries** | `analysis.taint.notes`, finding limitation | a parameter tainted at *one* call site makes the function's return value tainted at *every* call site; findings may therefore be conservative (false positives possible) |
 | **Flow-sensitive but not path-sensitive taint** | `feasibility` | straight-line and guarded paths are distinguished, and literal `false` prunes an edge, but correlated conditions (`if (a) … if (a)`) are not solved; the wording never claims symbolic execution |
+| **Loop conditions are not evaluated** | `certainty: approximate` | a loop body is treated as possibly skipped, so a value tainted *before* a loop whose body always overwrites it (`c = input(); while (i < 3) { c = "ls"; … } system(c);`) is still reported. The engine does not compute the trip count, so this is a may-analysis false positive, marked `approximate` |
+| **Explicit flows only (no implicit flows)** | — | taint follows data dependencies (assignments, expressions, arguments, returns). It does not follow control dependencies: `if (input() == "x") { c = "pwd"; }` does not make `c` tainted, so a value chosen by a branch on untrusted data is not reported. This is the standard explicit-flow policy and is a known false-negative class |
 | **May-analysis data dependence** | dependency graph edges, slices | an edge exists when the definition *may* reach the use; slices are conservative over-approximations and the slice carries a note saying so |
 | **No alias analysis** | pointers are unsupported, arrays are coarse | taint assigned to one array element is attributed to the whole array; two array elements are never distinguished |
 | **No struct/field precision** | structs are unsupported | — |
@@ -73,8 +82,8 @@ cap was hit. Truncation is never silent.
 
 ### 1.5 Coverage of the evaluation corpus
 
-The measured precision/recall figures in `docs/EVALUATION.md` describe **the 29
-hand-written corpus files in this repository**, nothing else. They are a
+The measured precision/recall figures in `docs/EVALUATION.md` describe **the 33
+hand-written `.ctc` corpus files in `examples/`**, nothing else. They are a
 regression signal for the pipeline, not an estimate of real-world detection
 quality, and the corpus is small enough that a single case moves the numbers by
 several points.

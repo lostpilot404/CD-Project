@@ -1,0 +1,1 @@
+Summaryfindings1by severityHIGH: 1by categorycommand-injection: 1statements / blocks5 / 4dependency edges7limits reachednoneOpen Findings, Program Graph, Data-Flow Analysis or Program Slicing to inspect the result of this run.

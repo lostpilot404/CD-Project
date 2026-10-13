@@ -324,6 +324,22 @@ def analyse_source(
             f"{len(unsupported)} construct(s) are outside the supported language subset and were "
             "not analysed: " + "; ".join(sorted({d.message for d in unsupported})[:3])
         )
+    # An error-severity semantic diagnostic (for example an undeclared
+    # identifier or an argument of the wrong type) means the program would not
+    # compile under C rules, and the analysis had to guess what that name or
+    # value refers to.  Such a run must not be presented as complete.  Errors
+    # that are already counted as unsupported constructs are not counted twice.
+    semantic_errors = [
+        d for d in semantic_result.diagnostics
+        if d.severity == "error" and not getattr(d, "unsupported", False)
+    ]
+    if semantic_errors:
+        partial_reasons.append(
+            f"{len(semantic_errors)} semantic error(s) were reported ("
+            + "; ".join(sorted({d.code for d in semantic_errors})[:4])
+            + "): the program would not compile, so names or values involved in those "
+            "errors were not resolved and the findings may be incomplete"
+        )
 
     program = Program(
         filename=filename,

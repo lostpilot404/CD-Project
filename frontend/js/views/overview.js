@@ -33,7 +33,7 @@ export function renderOverview(container, { state, health, language }) {
   const stats = el('div', { class: 'grid grid--stats' }, [
     stat(health ? health.engine_version : '—', 'engine version',
          health ? `API ${health.api_version}, schema ${health.schema_version}` : 'engine unreachable'),
-    stat(health ? health.grammar.states : '—', 'LALR(1) states',
+    stat(health ? health.grammar.lalr_states : '—', 'LALR(1) states',
          health ? `${health.grammar.productions} productions, ${health.grammar.conflicts} conflicts` : ''),
     stat(health ? health.rules_version : '—', 'rule set', 'validated before it is used'),
     stat(run ? run.filename : '—', 'last analysed file',

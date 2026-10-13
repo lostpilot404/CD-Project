@@ -1,0 +1,43 @@
+CodeTrace evaluation - engine 1.0.0, corpus 1.0 (33 cases)
+------------------------------------------------------------------------------------------------------------
+case                                         label          exp rep  TP  FP  FN  diag
+------------------------------------------------------------------------------------------------------------
+vulnerable/command_injection.ctc             vulnerable       1   1   1   0   0  
+vulnerable/sql_injection.ctc                 vulnerable       1   1   1   0   0  
+vulnerable/path_traversal.ctc                vulnerable       1   1   1   0   0  
+vulnerable/format_string.ctc                 vulnerable       1   1   1   0   0  
+vulnerable/two_step_command.ctc              vulnerable       1   1   1   0   0  
+safe/constant_command.ctc                    safe             0   0   0   0   0  
+safe/unrelated_variable.ctc                  safe             0   0   0   0   0  
+safe/source_never_reaches_sink.ctc           safe             0   0   0   0   0  
+safe/dead_branch_sink.ctc                    safe             0   0   0   0   0  SEM102
+sanitized/shell_escape.ctc                   sanitized        0   0   0   0   0  
+sanitized/sql_escape.ctc                     sanitized        0   0   0   0   0  
+sanitized/parse_to_int.ctc                   sanitized        0   0   0   0   0  
+sanitized/validated_command.ctc              sanitized        0   0   0   0   0  
+interprocedural/return_value.ctc             vulnerable       1   1   1   0   0  
+interprocedural/argument_flow.ctc            vulnerable       1   1   1   0   0  
+interprocedural/recursion.ctc                vulnerable       1   1   1   0   0  
+challenges/wrong_context_sanitizer.ctc       vulnerable       2   2   2   0   0  
+challenges/unknown_external_keeps_taint.ctc  vulnerable       1   1   1   0   0  SEM008
+challenges/array_element_taint.ctc           vulnerable       1   1   1   0   0  DFA001
+challenges/guarded_and_checked.ctc           vulnerable       1   1   1   0   0  
+challenges/multiple_sources_two_sinks.ctc    vulnerable       2   2   2   0   0  
+challenges/loop_carried.ctc                  vulnerable       1   1   1   0   0  
+unsupported/switch_statement.ctc             unsupported      0   0   0   0   0  LEX100,LEX102,SYN100
+unsupported/preprocessor_directive.ctc       unsupported      0   0   0   0   0  LEX101
+unsupported/pointer_type.ctc                 unsupported      0   0   0   0   0  SYN001
+syntax_errors/missing_semicolon.ctc          syntax_error     0   0   0   0   0  SYN001
+syntax_errors/unbalanced_braces.ctc          syntax_error     0   0   0   0   0  SEM020,SYN001
+syntax_errors/broken_expression.ctc          syntax_error     0   0   0   0   0  SYN001
+custom_rules/custom_rule_demo.ctc            custom_rule      1   1   1   0   0  SEM008
+challenges/decoy_in_comment_and_string.ctc   vulnerable       1   1   1   0   0  
+challenges/negated_validator_guard.ctc       vulnerable       1   1   1   0   0  
+challenges/shadowed_variable.ctc             vulnerable       1   1   1   0   0  SEM018
+safe/killed_by_constant.ctc                  safe             0   0   0   0   0  
+------------------------------------------------------------------------------------------------------------
+findings: TP=20 FP=0 FN=0   files: TN=9 FP=0 (9 safe/sanitized cases)
+precision=1.0  | recall=1.0  | F1=1.0 
+analysis time: 1.135s over 33 files
+wrote /home/user/CD-Project/var/evaluation.json
+wrote /home/user/CD-Project/var/evaluation.json

@@ -306,7 +306,7 @@ table.data td.num { font-variant-numeric: tabular-nums; text-align: right; }
   min-height: 24rem;
   overflow: auto;
 }
-.graph-svg { width: 100%; height: auto; display: block; }
+.graph-svg { height: auto; display: block; max-width: none; }
 .graph-svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.2; marker-end: url(#arrow); }
 .graph-svg .edge--taint { stroke: var(--critical); stroke-width: 1.8; }
 .graph-svg .edge--control { stroke-dasharray: 4 3; }

@@ -517,8 +517,12 @@ class LRParser:
         token = stream[pos]
         terminal = END if token.kind == EOF else token.kind
         state = state_stack[-1]
+        # Every terminal with an action in this state: a reduction on the
+        # lookahead is as much "expected" as a shift.  Counting shifts only gave
+        # an empty list after a missing ';', because the state reached before the
+        # offending token only reduces (Regression: 'expected one of: nothing').
         expected = sorted(
-            {t for (s, t), a in self.tables.action.items() if s == state and a.kind in (SHIFT, ACCEPT)}
+            {t for (s, t), a in self.tables.action.items() if s == state and a.kind in (SHIFT, ACCEPT, REDUCE)}
         )
         expected_txt = ", ".join(
             "end of file" if t == END else display_kind(t) for t in expected[:6]

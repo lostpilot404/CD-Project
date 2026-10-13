@@ -1,0 +1,489 @@
+{
+  "schema_version": "1.0",
+  "tool": {
+    "name": "CodeTrace",
+    "version": "1.0.0",
+    "description": "compiler-driven program dependency and vulnerability analysis"
+  },
+  "run": {
+    "run_id": "7d92289f6c3846b8",
+    "timestamp": "2026-10-13T10:24:55Z",
+    "engine_version": "1.0.0",
+    "rules_version": "builtin-3387b7dcd97a95f3",
+    "rule_set": {
+      "sources": 5,
+      "sinks": 8,
+      "sanitizers": 5,
+      "validators": 2,
+      "flows": 4,
+      "enabled_flows": 4,
+      "fingerprint": "3387b7dcd97a95f3",
+      "version": "builtin-3387b7dcd97a95f3",
+      "origin": "built-in rules"
+    },
+    "parser_mode": "lalr",
+    "grammar": {
+      "productions": 102,
+      "lalr_states": 167,
+      "conflicts": 0
+    }
+  },
+  "input": {
+    "filename": "command_injection.ctc",
+    "lines": 13,
+    "bytes": 330,
+    "sha256": "675d372e7081fb8f0d5c5106e16a79fd137c960442a491ba72ba4ed2a1d2c93c"
+  },
+  "language": {
+    "mode": "CT-C subset v1 (see docs/LANGUAGE.md)",
+    "dialect": "C-like subset parsed by a canonical LR(1) / LALR(1) parser"
+  },
+  "summary": {
+    "findings": 1,
+    "by_severity": {
+      "HIGH": 1
+    },
+    "by_category": {
+      "command-injection": 1
+    },
+    "by_certainty": {
+      "approximate": 1
+    },
+    "dispositions": {
+      "sink_calls_seen": 1,
+      "reported": 1,
+      "validator_guards": [],
+      "unreported_sink_calls": [],
+      "unreported_count": 0,
+      "statically_pruned_branches": [],
+      "note": "A sink call appears here when no enabled flow connects a configured source to it, when the required taint context was removed by a declared sanitizer, or when the statement sits in a branch whose literal condition makes it unreachable."
+    },
+    "errors": 0,
+    "warnings": 0,
+    "unsupported_constructs": 0,
+    "analysis_complete": true,
+    "partial_reasons": [],
+    "analysis_converged": true
+  },
+  "findings": [
+    {
+      "id": "FEF13A28F7E0E",
+      "rule_id": "command_execution",
+      "flow_id": "command_execution",
+      "category": "command-injection",
+      "severity": "HIGH",
+      "confidence": "medium",
+      "certainty": "approximate",
+      "sink": {
+        "rule": "command_system",
+        "function": "system",
+        "category": "command-injection",
+        "severity": "HIGH",
+        "context": "command",
+        "argument_index": 0,
+        "description": "executes its argument through the system command interpreter",
+        "sid": 3,
+        "line": 10,
+        "col": 10,
+        "statement_text": "system(command);",
+        "enclosing_function": "main",
+        "block": 2,
+        "expression": "command"
+      },
+      "source": {
+        "rule": "stdin",
+        "function": "input",
+        "description": "one line read from standard input; attacker controlled in most deployments",
+        "line": 8,
+        "col": 17,
+        "sid": 1,
+        "contexts": [
+          "command",
+          "sql",
+          "path",
+          "html",
+          "numeric",
+          "format"
+        ]
+      },
+      "sanitizers_seen": [],
+      "branch_conditions": [],
+      "feasibility": "unconditional",
+      "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+      "interprocedural": true,
+      "explanation": "Potential command injection flow detected: data introduced at line 8 (input) reaches argument 0 of system() at line 10, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 7 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 8) -> 'name' is assigned a tainted value at line 8 (line 8) -> argument 0 of the call to build_command() is tainted (line 9) -> 'user_input' is a parameter of build_command() (line 3) -> build_command() returns a tainted value (line 4) -> call to build_command() propagates taint to the caller (line 9) -> 'command' is assigned a tainted value at line 9 (line 9). The flow crosses at least one function boundary, so the interprocedural summary was used. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. Analysis certainty: approximate. This is a static finding: exploitability was not established.",
+      "limitations": [
+        "Interprocedural reasoning is context-insensitive: parameters are summarised across all call sites, which can add flows that a single call site cannot actually create.",
+        "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+      ],
+      "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+      "evidence": {
+        "engine_version": "1.0.0",
+        "rules_version": "builtin-3387b7dcd97a95f3",
+        "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+        "reaching_definitions": "used to justify each data-flow hop in the path",
+        "analyses": [
+          "lexer",
+          "canonical LR parser (LALR tables)",
+          "semantic analysis",
+          "control-flow graph",
+          "reaching definitions",
+          "liveness",
+          "definite assignment",
+          "taint propagation",
+          "program dependency graph"
+        ],
+        "atoms": [
+          "src:stdin@command"
+        ],
+        "flow_rule": {
+          "id": "command_execution",
+          "kind": "flow",
+          "description": "untrusted data reaches a command execution operation",
+          "severity": "HIGH",
+          "category": "command-injection",
+          "sources": [
+            "stdin",
+            "stdin_int",
+            "environment",
+            "command_line",
+            "file_content"
+          ],
+          "sinks": [
+            "command_system",
+            "command_exec",
+            "command_popen"
+          ],
+          "sanitizers": [
+            "shell_escape",
+            "parse_to_int",
+            "validate_command"
+          ],
+          "enabled": true,
+          "builtin": true,
+          "line": 171,
+          "col": 1
+        },
+        "sink_statement_span": [
+          299,
+          315
+        ]
+      },
+      "statement_ids": [
+        1,
+        1,
+        2,
+        0,
+        2,
+        2,
+        3
+      ],
+      "path_atoms": [
+        "src:stdin@command"
+      ],
+      "path_length": 8,
+      "path": [
+        {
+          "kind": "source",
+          "sid": 1,
+          "function": "main",
+          "line": 8,
+          "col": 17,
+          "symbol": "input",
+          "label": "input() introduces untrusted data (source rule 'stdin')",
+          "detail": "one line read from standard input; attacker controlled in most deployments",
+          "atoms": [
+            "src:stdin@command"
+          ],
+          "from_sid": -1,
+          "context": "",
+          "index": 0
+        },
+        {
+          "kind": "declaration",
+          "sid": 1,
+          "function": "main",
+          "line": 8,
+          "col": 3,
+          "symbol": "name",
+          "label": "'name' is assigned a tainted value at line 8",
+          "detail": "name declared and initialised",
+          "atoms": [
+            "src:stdin@command"
+          ],
+          "from_sid": 1,
+          "context": "",
+          "index": 1
+        },
+        {
+          "kind": "argument",
+          "sid": 2,
+          "function": "main",
+          "line": 9,
+          "col": 34,
+          "symbol": "name",
+          "label": "argument 0 of the call to build_command() is tainted",
+          "detail": "the caller passes this value to parameter 0 ('user_input') at line 9",
+          "atoms": [
+            "src:stdin@command"
+          ],
+          "from_sid": 1,
+          "context": "",
+          "index": 2
+        },
+        {
+          "kind": "parameter",
+          "sid": -2,
+          "function": "build_command",
+          "line": 3,
+          "col": 22,
+          "symbol": "user_input",
+          "label": "'user_input' is a parameter of build_command()",
+          "detail": "the value enters this function through its parameter list",
+          "atoms": [
+            "src:stdin@command"
+          ],
+          "from_sid": 2,
+          "context": "",
+          "index": 3
+        },
+        {
+          "kind": "return",
+          "sid": 0,
+          "function": "build_command",
+          "line": 4,
+          "col": 3,
+          "symbol": "return",
+          "label": "build_command() returns a tainted value",
+          "detail": "the returned expression carries the same taint atom",
+          "atoms": [
+            "src:stdin@command"
+          ],
+          "from_sid": -2,
+          "context": "",
+          "index": 4
+        },
+        {
+          "kind": "call",
+          "sid": 2,
+          "function": "main",
+          "line": 9,
+          "col": 20,
+          "symbol": "build_command",
+          "label": "call to build_command() propagates taint to the caller",
+          "detail": "the function summary records that the arguments flowing into this call influence the returned value",
+          "atoms": [
+            "src:stdin@command"
+          ],
+          "from_sid": 0,
+          "context": "",
+          "index": 5
+        },
+        {
+          "kind": "declaration",
+          "sid": 2,
+          "function": "main",
+          "line": 9,
+          "col": 3,
+          "symbol": "command",
+          "label": "'command' is assigned a tainted value at line 9",
+          "detail": "command declared and initialised",
+          "atoms": [
+            "src:stdin@command"
+          ],
+          "from_sid": 2,
+          "context": "",
+          "index": 6
+        },
+        {
+          "kind": "sink",
+          "sid": 3,
+          "function": "main",
+          "line": 10,
+          "col": 10,
+          "symbol": "command",
+          "label": "system() argument 0 consumes data that is not safe for context 'command'",
+          "detail": "sink rule 'command_system' (executes its argument through the system command interpreter) matched by the taint engine",
+          "atoms": [
+            "src:stdin@command"
+          ],
+          "from_sid": 2,
+          "context": "",
+          "index": 7
+        }
+      ]
+    }
+  ],
+  "diagnostics": [],
+  "unsupported": {
+    "offsets": [],
+    "features": []
+  },
+  "unknown_values": [],
+  "analysis": {
+    "order": [
+      "lexer",
+      "canonical LR(1) parser (LALR(1) tables by default)",
+      "abstract syntax tree",
+      "semantic analysis and symbol tables",
+      "control-flow graph",
+      "reaching definitions",
+      "liveness",
+      "definite assignment",
+      "taint propagation (sources, sinks, sanitizers, function summaries)",
+      "program dependency graph",
+      "program slicing",
+      "finding generation"
+    ],
+    "functions": [
+      {
+        "function": "build_command",
+        "blocks": 2,
+        "edges": 1,
+        "definitions": 1,
+        "reachable_blocks": 2,
+        "unreachable_blocks": 0,
+        "loops": 0,
+        "reaching_definitions_iterations": 2,
+        "reaching_definitions_converged": true,
+        "liveness_iterations": 2,
+        "liveness_converged": true,
+        "definite_assignment_converged": true
+      },
+      {
+        "function": "main",
+        "blocks": 2,
+        "edges": 1,
+        "definitions": 2,
+        "reachable_blocks": 2,
+        "unreachable_blocks": 0,
+        "loops": 0,
+        "reaching_definitions_iterations": 2,
+        "reaching_definitions_converged": true,
+        "liveness_iterations": 2,
+        "liveness_converged": true,
+        "definite_assignment_converged": true
+      }
+    ],
+    "taint": {
+      "engine_version": "taint-1",
+      "iterations": 4,
+      "converged": true,
+      "functions": {
+        "build_command": {
+          "converged": true,
+          "iterations": 2,
+          "hits": [],
+          "call_sites": 0
+        },
+        "main": {
+          "converged": true,
+          "iterations": 2,
+          "hits": [
+            {
+              "sid": 3,
+              "sink_rule": "command_system",
+              "function": "system",
+              "argument_index": 0,
+              "line": 10,
+              "col": 10,
+              "atoms": [
+                "src:stdin@command"
+              ],
+              "context": "command",
+              "block": 2,
+              "enclosing_function": "main"
+            }
+          ],
+          "call_sites": 1
+        }
+      },
+      "summaries": {
+        "build_command": {
+          "0": [
+            "command",
+            "format",
+            "html",
+            "numeric",
+            "path",
+            "sql"
+          ]
+        },
+        "main": {}
+      },
+      "infeasible_branches": [],
+      "guard_suppressions": [],
+      "notes": [
+        "Interprocedural propagation is context-insensitive: a parameter that is tainted at one call site is analysed as tainted at every call site of that function."
+      ]
+    },
+    "dependency_graph": {
+      "nodes": 10,
+      "edges": 7,
+      "edge_kinds": {
+        "define": 2,
+        "taint": 3,
+        "call": 1,
+        "return": 1
+      }
+    }
+  },
+  "metrics": {
+    "grammar_states": 167,
+    "grammar_productions": 102,
+    "grammar_conflicts": 0,
+    "source_lines": 13,
+    "source_bytes": 330,
+    "tokens": 43,
+    "ast_nodes": 22,
+    "statements": 5,
+    "functions": 2,
+    "symbols": 7,
+    "scopes": 3,
+    "calls": 3,
+    "basic_blocks": 4,
+    "cfg_edges": 2,
+    "definitions": 3,
+    "unreachable_blocks": 0,
+    "dependency_edges": 7,
+    "dependency_nodes": 10,
+    "taint_hits": 1,
+    "findings": 1,
+    "dataflow_iterations": 12,
+    "parser_mode": "lalr",
+    "engine_version": "1.0.0",
+    "rules_version": "builtin-3387b7dcd97a95f3",
+    "limits_hit": [],
+    "analysis_complete": true,
+    "partial_reasons": [],
+    "timings": {
+      "lex_seconds": 0.000237,
+      "parse_seconds": 0.000761,
+      "grammar_tables_seconds": 0.001146,
+      "semantic_seconds": 0.000137,
+      "cfg_seconds": 0.000127,
+      "dataflow_seconds": 0.000284,
+      "taint_seconds": 0.001904,
+      "dependencies_seconds": 0.000142,
+      "slicing_setup_seconds": 2e-06,
+      "findings_seconds": 0.000522
+    }
+  },
+  "evaluation": {
+    "available": false,
+    "note": "no labelled expectation was supplied for this run"
+  },
+  "notes": [
+    "Interprocedural propagation is context-insensitive: a parameter that is tainted at one call site is analysed as tainted at every call site of that function."
+  ],
+  "limitations": [
+    "Static analysis only: the analysed program is never executed. A reported flow means the analysis could not exclude it, not that it is exploitable.",
+    "The supported language subset is documented in docs/LANGUAGE.md; constructs outside it are reported as unsupported and are not analysed.",
+    "Interprocedural reasoning is context-insensitive: a parameter tainted at one call site is summarised as tainted for every call site.",
+    "Pointers, aliasing, dynamic memory, structs, and the preprocessor are outside the supported subset and are never assumed safe.",
+    "Array elements are not tracked individually; taint assigned to one element is attributed to the whole array.",
+    "Sanitizers are only trusted where a rule declares them, and only for the declared context; unknown functions are never assumed to validate their arguments.",
+    "A branch guarded by a rule-declared validator suppresses the flows through that branch: the validator's implementation is not analysed, so the run assumes it rejects every value that is unsafe for its context. Every such suppression is listed in guard_suppressions.",
+    "Reports contain the results of the run they were produced from; re-running after editing the source or the rules produces a new, independent report."
+  ]
+}

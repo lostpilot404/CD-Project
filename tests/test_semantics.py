@@ -136,6 +136,22 @@ class SymbolTableTests(unittest.TestCase):
         symbols = symbol_map(program)
         self.assertTrue(symbols["counter"].is_global)
 
+    def test_undeclared_identifier_makes_the_run_partial(self):
+        # Regression: a program with an error-severity semantic diagnostic was
+        # reported as analysis_complete=True, although the name could not be
+        # resolved.  The run must say it is partial and why.
+        program = analyse("int main() { int a = 1; a = b + 1; return a; }")
+        self.assertIn("SEM001", codes(program.diagnostics))
+        self.assertFalse(program.analysis_complete)
+        self.assertTrue(any("semantic error" in reason for reason in program.partial_reasons))
+        self.assertFalse(program.ok)
+
+    def test_warnings_alone_keep_the_run_complete(self):
+        # Shadowing is a warning, not an error: the analysis is still complete.
+        program = analyse("int main() { int x = 1; { int x = 2; } return x; }")
+        self.assertIn("SEM018", codes(program.diagnostics))
+        self.assertTrue(program.analysis_complete, program.partial_reasons)
+
     def test_unsupported_construct_is_recorded_with_an_offset(self):
         program = analyse("int main() { switch (1) { } return 0; }")
         self.assertTrue(program.semantic.unsupported_offsets, "the skipped construct must be recorded")

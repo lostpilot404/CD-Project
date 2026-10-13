@@ -64,7 +64,10 @@ after(async () => {
 test('the page boots, reports the engine version and the grammar facts', () => {
   const status = page.document.getElementById('engine-status').textContent;
   assert.match(status, new RegExp(engine.health.engine_version.replace(/\./g, '\\.')));
-  assert.match(status, /states \/ \d+ conflicts/);
+  // Regression: the badge once read grammar.states (absent from the API) and
+  // showed "undefined states"; the old pattern matched that by accident.
+  assert.match(status, /(^|\s)\d+ states \/ \d+ conflicts/);
+  assert.doesNotMatch(status, /undefined|NaN|null/);
   assert.equal(page.document.getElementById('global-error').hidden, true);
   assert.ok(viewText('overview').length > 80, 'the overview is not an empty page');
 });
