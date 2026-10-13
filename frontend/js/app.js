@@ -73,15 +73,25 @@ async function refresh(route = currentRoute()) {
         onFilter: (patch) => { update({ filters: { ...state.filters, ...patch } }); refresh('findings'); },
         onSort: (sortKey) => { update({ sort: sortKey }); refresh('findings'); },
         onSelect: selectFinding,
-        onShowSlice: (target, finding) => {
-          if (target === 'graph') {
-            update({ graph: { ...state.graph, mode: 'dependency' }, selectedFinding: finding.id });
-            window.location.hash = '#/graph';
-            loadStatementSubgraph(finding);
-          } else {
-            update({ slicing: { ...state.slicing, source: 'finding' } });
-            window.location.hash = '#/slicing';
-            loadSliceForFinding(finding.id);
+        onShowSlice: async (target, finding) => {
+          // Load first, navigate second.  Navigating first raced the view's
+          // own lazy loading (which would fetch the full graph / a default
+          // statement slice into the same slot), the load's completion did
+          // not itself trigger a re-render, and a failed load surfaced only
+          // as an unhandled rejection in the console.
+          try {
+            if (target === 'graph') {
+              update({ graph: { ...state.graph, mode: 'dependency' }, selectedFinding: finding.id });
+              await loadStatementSubgraph(finding);
+              window.location.hash = '#/graph';
+            } else {
+              update({ slicing: { ...state.slicing, source: 'finding' } });
+              await loadSliceForFinding(finding.id);
+              window.location.hash = '#/slicing';
+            }
+            showError('');
+          } catch (error) {
+            showError(`Could not load that view for the finding: ${error.message}`);
           }
         },
         onSelectStatement: selectStatement,
@@ -142,7 +152,14 @@ async function refresh(route = currentRoute()) {
         },
         onDirection: async (direction) => {
           update({ slicing: { ...state.slicing, direction, data: null } });
-          await loadSliceData(state.slicing.sid);
+          // A finding (security) slice has no statement criterion and no
+          // direction: recompute that slice instead of asking the statement
+          // endpoint for `sid=null`.
+          if (state.slicing.source === 'finding' && state.selectedFinding) {
+            await loadSliceForFinding(state.selectedFinding);
+          } else {
+            await loadSliceData(state.slicing.sid);
+          }
           refresh('slicing');
         },
         onSelectStatement: selectStatement,
@@ -203,7 +220,9 @@ async function loadStatementSubgraph(finding) {
   const statementNodes = new Set((finding.statement_ids || []).map((sid) => `s${sid}`));
   const nodes = graph.nodes.filter((node) => statementNodes.has(node.id) || node.kind === 'function');
   const kept = new Set(nodes.map((node) => node.id));
-  const edges = graph.edges.filter((edge) => kept.has(edge.from) || kept.has(edge.to));
+  // Both endpoints must survive: an edge pointing at a dropped node cannot
+  // be drawn, but it would still be counted in the "edges shown" total.
+  const edges = graph.edges.filter((edge) => kept.has(edge.from) && kept.has(edge.to));
   update({ graph: { ...state.graph, data: { ...graph, nodes, edges }, focus: finding.id } });
 }
 
@@ -296,6 +315,9 @@ function wireInputs() {
   view.querySelector('#clear-button').addEventListener('click', () => {
     resetRun();
     editor.value = '';
+    // The filename counts as untouched again, so the next run's name is
+    // shown instead of the cleared run's name lingering as "user input".
+    filename.dataset.touched = '';
     refresh('analyze');
   });
 

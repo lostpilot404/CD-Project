@@ -20,6 +20,13 @@ export function el(tag, attrs = {}, children = []) {
       for (const [dataKey, dataValue] of Object.entries(value)) {
         if (dataValue !== null && dataValue !== undefined) node.dataset[dataKey] = String(dataValue);
       }
+    } else if (key === 'value') {
+      // The live property, not just the attribute: an attribute only seeds
+      // the value of a pristine control, so re-rendering a form the user has
+      // already typed into (e.g. the findings search box) must set `value`
+      // directly for the restored text to actually be shown.
+      node[key] = value;
+      node.setAttribute(key, String(value));
     } else if (key === 'on') {
       for (const [eventName, handler] of Object.entries(value)) {
         node.addEventListener(eventName, handler);

@@ -521,3 +521,161 @@ test('a run whose only sink call was cleared by a validator says so, and names i
   assert.match(findingsText, /not that the program is safe/);
   assert.match(findingsText, /inspected and not reported/);
 });
+
+test('typing in the findings search keeps focus in the search box', async () => {
+  // Regression: filtering re-renders the toolbar on every keystroke, which
+  // used to replace the focused search input and drop focus after one
+  // character.  Focus (the element the document reports as active) must land
+  // on the replacement input, with the typed text intact.
+  await go('analyze');
+  page.document.getElementById('source-input').value = PROGRAM;
+  page.document.getElementById('filename-input').value = 'search-fixture.ctc';
+  page.document.getElementById('analyze-button').click();
+  await waitFor(
+    () => page.document.getElementById('analyze-status').textContent.includes('search-fixture.ctc'),
+    'the search-fixture analysis',
+    30000,
+  );
+  await go('findings');
+  const search = page.document.getElementById('findings-search');
+  assert.ok(search, 'the search box exists');
+  search.focus();
+  search.value = 'system';
+  search.dispatchEvent({ type: 'input', target: search });
+  await waitFor(
+    () => page.document.getElementById('findings-toolbar').textContent.includes('1 of 2 finding'),
+    'the search-filtered list',
+  );
+  const replacement = page.document.getElementById('findings-search');
+  assert.notEqual(replacement, search, 'the toolbar was re-rendered');
+  assert.equal(page.document.activeElement, replacement, 'focus is restored to the new search box');
+  assert.equal(replacement.value, 'system', 'the typed text survives the re-render');
+  // Leave the filter empty for the tests that follow.
+  replacement.value = '';
+  replacement.dispatchEvent({ type: 'input', target: replacement });
+  await waitFor(
+    () => page.document.getElementById('findings-toolbar').textContent.includes('2 of 2 finding'),
+    'the unfiltered list again',
+  );
+});
+
+test('a new analysis does not show the previous run\u2019s graph, data-flow or slice', async () => {
+  // Regression: the views fetch lazily only when their state slot is empty,
+  // and a new run used to leave the old run's artefacts in those slots — the
+  // Graph page then drew the *previous* program under the new run's name.
+  const { state } = await import('../js/state.js');
+  await go('analyze');
+  page.document.getElementById('source-input').value = PROGRAM;
+  page.document.getElementById('filename-input').value = 'first-fixture.ctc';
+  page.document.getElementById('analyze-button').click();
+  await waitFor(
+    () => page.document.getElementById('analyze-status').textContent.includes('first-fixture.ctc'),
+    'the first analysis',
+    30000,
+  );
+  await go('graph');
+  await waitFor(() => page.document.getElementById('graph-canvas').querySelector('svg'), 'the first graph', 20000);
+  await go('dataflow');
+  await waitFor(
+    () => page.document.getElementById('dataflow-body').textContent.includes('Basic blocks'),
+    'the first data-flow result',
+    20000,
+  );
+  await go('slicing');
+  await waitFor(
+    () => page.document.getElementById('slicing-body').textContent.includes('slice ('),
+    'the first slice',
+    20000,
+  );
+  assert.ok(state.graph.data && state.dataflow.data && state.slicing.data, 'artefacts are loaded');
+
+  await go('analyze');
+  page.document.getElementById('source-input').value =
+    'int main() {\n  string cmd = input();\n  system(cmd);\n  return 0;\n}\n';
+  page.document.getElementById('filename-input').value = 'second-fixture.ctc';
+  page.document.getElementById('analyze-button').click();
+  await waitFor(
+    () => page.document.getElementById('analyze-status').textContent.includes('second-fixture.ctc'),
+    'the second analysis',
+    30000,
+  );
+  assert.equal(state.run.filename, 'second-fixture.ctc');
+  assert.equal(state.graph.data, null, 'the graph of the previous run is discarded');
+  assert.equal(state.dataflow.data, null, 'the data-flow result of the previous run is discarded');
+  assert.equal(state.slicing.data, null, 'the slice of the previous run is discarded');
+  assert.equal(state.statementDetail, null, 'the statement detail of the previous run is discarded');
+  assert.equal(state.comparison, null, 'a comparison of earlier runs is discarded');
+
+  // And the Graph page now draws this run's graph, checked against the API.
+  const expected = await (await fetch(
+    `${engine.baseUrl}/api/runs/${state.run.run_id}/graph?limit=4000`,
+  )).json();
+  await go('graph');
+  await waitFor(() => page.document.getElementById('graph-canvas').querySelector('svg'), 'the second graph', 20000);
+  assert.equal(state.graph.data.nodes.length, expected.nodes.length, 'the drawn graph is the new run\u2019s');
+  assert.match(
+    page.document.getElementById('graph-canvas').textContent,
+    new RegExp(`Graph: ${expected.nodes.length} node`),
+  );
+
+  // Clear discards the artefacts too, and the Graph page returns to its
+  // empty state instead of resurrecting the cleared run.
+  await go('analyze');
+  page.document.getElementById('clear-button').click();
+  assert.equal(state.run, null);
+  assert.equal(state.graph.data, null, 'Clear discards the graph');
+  await go('graph');
+  assert.match(viewText('graph'), /No analysis has run yet/);
+});
+
+test('a finding\u2019s graph and slice buttons land on that finding\u2019s data', async () => {
+  // Regression: these buttons used to navigate first and load afterwards
+  // (unawaited), racing the destination view's own lazy loading and leaving
+  // the loaded subgraph/slice unrendered with failures only in the console.
+  const { state } = await import('../js/state.js');
+  await go('analyze');
+  page.document.getElementById('source-input').value = PROGRAM;
+  page.document.getElementById('filename-input').value = 'nav-fixture.ctc';
+  page.document.getElementById('analyze-button').click();
+  await waitFor(
+    () => page.document.getElementById('analyze-status').textContent.includes('nav-fixture.ctc'),
+    'the nav-fixture analysis',
+    30000,
+  );
+  await go('findings');
+  page.document.querySelectorAll('#findings-list .finding-card__select')[0].click();
+  await waitFor(
+    () => page.document.getElementById('finding-detail').querySelectorAll('.evidence-path li').length >= 5,
+    'the finding detail',
+    20000,
+  );
+  const finding = state.run.findings[0];
+  const detail = page.document.getElementById('finding-detail');
+  const sliceButton = detail.querySelectorAll('button').find((b) => b.textContent.includes('Security slice'));
+  assert.ok(sliceButton, 'the security-slice button exists');
+  sliceButton.click();
+  await waitFor(() => state.slicing.data && state.slicing.data.finding_id === finding.id, 'the finding slice to load', 20000);
+  await go('slicing');
+  await waitFor(
+    () => page.document.getElementById('slicing-body').textContent.includes('Statements in the slice'),
+    'the rendered finding slice',
+    20000,
+  );
+
+  await go('findings');
+  const graphButton = page.document.getElementById('finding-detail')
+    .querySelectorAll('button').find((b) => b.textContent.includes('Show in Program Graph'));
+  assert.ok(graphButton, 'the program-graph button exists');
+  graphButton.click();
+  await waitFor(() => state.graph.focus === finding.id && state.graph.data, 'the finding subgraph to load', 20000);
+  await go('graph');
+  await waitFor(() => page.document.getElementById('graph-canvas').querySelector('svg'), 'the rendered subgraph', 20000);
+  const allowed = new Set((finding.statement_ids || []).map((sid) => `s${sid}`));
+  for (const node of state.graph.data.nodes) {
+    assert.ok(allowed.has(node.id) || node.kind === 'function', `node ${node.id} belongs to the finding`);
+  }
+  for (const edge of state.graph.data.edges) {
+    const ids = new Set(state.graph.data.nodes.map((node) => node.id));
+    assert.ok(ids.has(edge.from) && ids.has(edge.to), 'every counted edge can actually be drawn');
+  }
+});

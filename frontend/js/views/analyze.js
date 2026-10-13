@@ -7,7 +7,7 @@
 import { el, render } from '../lib/dom.js';
 import { api, ApiError } from '../api.js';
 import { renderSource } from '../source.js';
-import { update } from '../state.js';
+import { update, invalidateRunArtifacts } from '../state.js';
 
 const DIAGNOSTIC_ORDER = { error: 0, warning: 1, info: 2 };
 
@@ -198,6 +198,10 @@ export async function runAnalysis(container, { filename, source, parserMode, use
     if (!useBuiltin) payload.use_builtin_rules = false;
     if (customRules && customRules.trim()) payload.rules = customRules;
     const run = await api.analyze(payload);
+    // The new run supersedes the old one: graph, data-flow, slice, statement
+    // and comparison data fetched for the previous run must not survive into
+    // this one (the views only refetch when their slot is empty).
+    invalidateRunArtifacts();
     update({ run, source });
     render(status, el('span', { text: `Analysed ${run.filename} in ${run.total_analysis_seconds} s.` }));
     return run;

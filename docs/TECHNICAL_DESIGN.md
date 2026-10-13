@@ -53,8 +53,8 @@ itself. `python3 -m codetrace.api` is the whole deployment.
 | `codetrace/api` | 4 | 1079 | HTTP server, routing, request validation, limits, schemas catalogue, `python3 -m` entry point |
 | `codetrace/*.py` | 2 | 22 | version constants and the package docstring |
 | `tests/` | 17 | 5397 | lexer, parser, semantics, CFG, data flow, taint, slicing, rules, API, reporting, end-to-end workflow, audit and mutation-check self-tests |
-| `frontend/` | 20 | 2835 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
-| `frontend/tests/` | 4 | 1368 | stub DOM, harness, library tests, view tests against a real engine |
+| `frontend/` | 20 | 2923 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
+| `frontend/tests/` | 4 | 1540 | stub DOM, harness, library tests, view tests against a real engine |
 | `evaluation/` | 2 | 754 | labelled corpus harness and `expectations.json` |
 | `scripts/` | 5 | 1401 | dev server, full test run, corpus evaluation, independent audit, mutation check |
 | `docs/` | 12 | 3739 | the documentation set (see `README.md`) |

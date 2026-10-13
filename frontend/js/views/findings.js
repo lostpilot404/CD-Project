@@ -45,6 +45,7 @@ export function renderToolbar(container, { state, onFilter, onSort, findings }) 
       el('span', { text: 'Search' }),
       el('input', {
         type: 'search',
+        id: 'findings-search',
         value: filters.search,
         placeholder: 'rule, function, text…',
         on: { input: (event) => onFilter({ search: event.target.value }) },
@@ -180,6 +181,18 @@ export async function renderFindings(container, { state, onFilter, onSort, onSel
   const detailNode = container.querySelector('#finding-detail');
   const run = state.run;
 
+  // Typing in the search box filters on every keystroke, and filtering
+  // re-renders this toolbar — which replaces the search input itself.  In a
+  // browser that drops focus (and the caret) after the first character, so
+  // remember them here and restore them once the new toolbar is in place.
+  const previousSearch = toolbar.querySelector('#findings-search');
+  const searchHadFocus = Boolean(
+    previousSearch && typeof document !== 'undefined' && document.activeElement === previousSearch,
+  );
+  const searchCaret = searchHadFocus && typeof previousSearch.selectionStart === 'number'
+    ? previousSearch.selectionStart
+    : null;
+
   if (!run) {
     render(toolbar, []);
     render(listNode, el('p', { class: 'empty-state', text: 'No analysis has run yet. Use “Analyze Code” first.' }));
@@ -223,6 +236,16 @@ export async function renderFindings(container, { state, onFilter, onSort, onSel
     onShowSlice,
     onSelectStatement,
   });
+
+  if (searchHadFocus) {
+    const nextSearch = toolbar.querySelector('#findings-search');
+    if (nextSearch && typeof nextSearch.focus === 'function') {
+      nextSearch.focus();
+      if (searchCaret !== null && typeof nextSearch.setSelectionRange === 'function') {
+        try { nextSearch.setSelectionRange(searchCaret, searchCaret); } catch (error) { /* caret is best-effort */ }
+      }
+    }
+  }
   return container;
 }
 
