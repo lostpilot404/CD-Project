@@ -1,0 +1,7 @@
+// expect: no findings: shell_escape neutralises command-context taint
+int main() {
+  string name = input();
+  string safe = shell_escape(name);
+  system(safe);
+  return 0;
+}

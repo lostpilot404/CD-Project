@@ -1,0 +1,8 @@
+// expect: 1 finding, feasibility guarded: the sink is inside a branch that was not evaluated
+int main() {
+  string name = input();
+  if (strlen(name) > 2) {
+    system(name);
+  }
+  return 0;
+}

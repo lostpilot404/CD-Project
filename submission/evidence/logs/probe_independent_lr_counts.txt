@@ -1,0 +1,4 @@
+expr grammar (canonical LR1, LR0, LALR-by-core): (30, 16, 16)
+S->CC (expect 10 canonical, 7 LR0 cores(LR0 count), 7 LALR): (10, 7, 7)
+CT-C grammar productions 102
+CT-C (canonical LR1, LR0, LALR-by-core): (656, 167, 167)

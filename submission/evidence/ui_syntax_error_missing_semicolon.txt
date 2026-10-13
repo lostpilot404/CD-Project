@@ -1,0 +1,10 @@
+Diagnostics
+Diagnostics reported for this file
+SEVERITY	CODE	LINE:COL	PHASE	MESSAGE
+error	SYN001	4:3	parser	unexpected identifier 'system'
+the parser expected one of: &&, =, ,, --, ==, >=
+
+error	SYN001	4:15	parser	unexpected ;
+the parser expected one of: ,, )
+
+This analysis is partial: the parser recovered from 2 syntax error(s), so statements were skipped and this analysis is partial

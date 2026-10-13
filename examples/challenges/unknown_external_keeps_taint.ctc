@@ -1,0 +1,7 @@
+// expect: 1 finding plus a SEM008 warning: an unknown function never clears taint
+int main() {
+  string name = input();
+  string processed = transform_unknown(name);
+  system(processed);
+  return 0;
+}

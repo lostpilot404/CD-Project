@@ -1,0 +1,14 @@
+// expect: 1 finding, rule command_execution, certainty unproven (recursion limit reached)
+string repeat(string value, int times) {
+  if (times <= 0) {
+    return value;
+  }
+  return repeat(value, times - 1);
+}
+
+int main() {
+  string name = input();
+  string command = repeat(name, 2);
+  system(command);
+  return 0;
+}

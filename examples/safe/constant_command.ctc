@@ -1,0 +1,6 @@
+// expect: no findings, no diagnostics
+int main() {
+  string command = "ls -l /tmp";
+  system(command);
+  return 0;
+}

@@ -1,0 +1,20 @@
+Diagnostics
+Diagnostics reported for this file
+SEVERITY	CODE	LINE:COL	PHASE	MESSAGE
+error	LEX100	4:3	lexer	unsupported construct: switch statements are outside the supported subset
+switch statements are outside the supported subset
+Unsupported construct: the enclosing statement was skipped, not guessed at.
+
+error	SYN100	4:3	parser	unsupported construct: keyword 'switch'
+the analysed language subset does not define this keyword. CodeTrace does not guess the meaning of unsupported syntax: the enclosing statement is skipped and marked as unanalysed.
+Unsupported construct: the enclosing statement was skipped, not guessed at.
+
+error	LEX100	5:5	lexer	unsupported construct: switch/case statements are outside the supported subset
+switch/case statements are outside the supported subset
+Unsupported construct: the enclosing statement was skipped, not guessed at.
+
+error	LEX102	5:11	lexer	unsupported construct: the ':' token is outside the supported subset
+the ':' token is outside the supported subset
+Unsupported construct: the enclosing statement was skipped, not guessed at.
+
+This analysis is partial: the parser recovered from 1 syntax error(s), so statements were skipped and this analysis is partial; 4 construct(s) are outside the supported language subset and were not analysed: unsupported construct: keyword 'switch'; unsupported construct: switch statements are outside the supported subset; unsupported construct: switch/case statements are outside the supported subset

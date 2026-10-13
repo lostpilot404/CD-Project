@@ -1,0 +1,7 @@
+// expect: no finding: the tainted value is overwritten before the sink
+int main() {
+  string command = input();
+  command = "ls /tmp";
+  system(command);
+  return 0;
+}

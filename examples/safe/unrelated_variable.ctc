@@ -1,0 +1,8 @@
+// expect: no findings: the tainted value is printed, but a different value reaches the sink
+int main() {
+  string untrusted = input();
+  string trusted = "date";
+  system(trusted);
+  print(untrusted);
+  return 0;
+}

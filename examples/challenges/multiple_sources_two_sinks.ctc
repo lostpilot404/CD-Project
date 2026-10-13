@@ -1,0 +1,8 @@
+// expect: 2 findings: stdin and an environment variable reach two different sinks
+int main() {
+  string from_stdin = input();
+  string from_env = readenv("HOME");
+  system(from_stdin);
+  readfile(from_env);
+  return 0;
+}

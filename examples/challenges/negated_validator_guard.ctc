@@ -1,0 +1,8 @@
+// expect: 1 finding, feasibility guarded: the validator guards the other branch
+int main() {
+  string name = input();
+  if (!is_safe_command(name)) {
+    system(name);
+  }
+  return 0;
+}

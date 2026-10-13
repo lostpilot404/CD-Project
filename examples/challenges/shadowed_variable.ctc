@@ -1,0 +1,10 @@
+// expect: 1 finding: only the outer `name` is tainted; the inner one is a constant
+int main() {
+  string name = input();
+  {
+    string name = "ls /tmp";
+    system(name);
+  }
+  system(name);
+  return 0;
+}

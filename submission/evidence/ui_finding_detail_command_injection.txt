@@ -1,0 +1,56 @@
+HIGH command-injection
+finding id
+FEF13A28F7E0E
+flow rule
+command_execution
+confidence / certainty
+medium / approximate
+reasoning
+interprocedural (a function boundary was crossed)
+path feasibility
+unconditional — no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.
+sink
+system() line 10:10 in main()
+source
+stdin (input) line 8
+Why this was reported
+
+Potential command injection flow detected: data introduced at line 8 (input) reaches argument 0 of system() at line 10, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 7 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 8) -> 'name' is assigned a tainted value at line 8 (line 8) -> argument 0 of the call to build_command() is tainted (line 9) -> 'user_input' is a parameter of build_command() (line 3) -> build_command() returns a tainted value (line 4) -> call to build_command() propagates taint to the caller (line 9) -> 'command' is assigned a tainted value at line 9 (line 9). The flow crosses at least one function boundary, so the interprocedural summary was used. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. Analysis certainty: approximate. This is a static finding: exploitability was not established.
+
+Evidence path
+input() introduces untrusted data (source rule 'stdin')
+source · line 8:17 · main()
+one line read from standard input; attacker controlled in most deployments
+'name' is assigned a tainted value at line 8
+declaration · line 8:3 · main()
+name declared and initialised
+argument 0 of the call to build_command() is tainted
+argument · line 9:34 · main()
+the caller passes this value to parameter 0 ('user_input') at line 9
+'user_input' is a parameter of build_command()
+parameter · line 3:22 · build_command()
+the value enters this function through its parameter list
+build_command() returns a tainted value
+return · line 4:3 · build_command()
+the returned expression carries the same taint atom
+call to build_command() propagates taint to the caller
+call · line 9:20 · main()
+the function summary records that the arguments flowing into this call influence the returned value
+'command' is assigned a tainted value at line 9
+declaration · line 9:3 · main()
+command declared and initialised
+system() argument 0 consumes data that is not safe for context 'command'
+sink · line 10:10 · main()
+sink rule 'command_system' (executes its argument through the system command interpreter) matched by the taint engine
+Limitations of this finding
+Interprocedural reasoning is context-insensitive: parameters are summarised across all call sites, which can add flows that a single call site cannot actually create.
+The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established.
+Remediation
+
+Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.
+
+Source context
+1// expect: 1 finding, rule command_execution, HIGH, category command-injection2// Untrusted standard input is concatenated into a shell command.3string build_command(string user_input) {4  return "ls " + user_input;5}6 7int main() {8  string name = input();9  string command = build_command(name);10  system(command);11  return 0;12}
+Show in Program Graph
+Security slice of this finding
+Evidence record (what justified each hop)

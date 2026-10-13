@@ -1,0 +1,3664 @@
+{
+  "corpus_version": "1.0",
+  "engine_version": "1.0.0",
+  "schema_version": "1.0",
+  "evaluated_at": "2026-10-13T10:25:54Z",
+  "environment": {
+    "python": "3.11.2",
+    "platform": "Linux-6.1.158+-x86_64-with-glibc2.36",
+    "machine": "x86_64",
+    "processor_count": 2
+  },
+  "corpus": {
+    "cases": 33,
+    "safe_or_sanitized_cases": 9,
+    "files": [
+      "vulnerable/command_injection.ctc",
+      "vulnerable/sql_injection.ctc",
+      "vulnerable/path_traversal.ctc",
+      "vulnerable/format_string.ctc",
+      "vulnerable/two_step_command.ctc",
+      "safe/constant_command.ctc",
+      "safe/unrelated_variable.ctc",
+      "safe/source_never_reaches_sink.ctc",
+      "safe/dead_branch_sink.ctc",
+      "sanitized/shell_escape.ctc",
+      "sanitized/sql_escape.ctc",
+      "sanitized/parse_to_int.ctc",
+      "sanitized/validated_command.ctc",
+      "interprocedural/return_value.ctc",
+      "interprocedural/argument_flow.ctc",
+      "interprocedural/recursion.ctc",
+      "challenges/wrong_context_sanitizer.ctc",
+      "challenges/unknown_external_keeps_taint.ctc",
+      "challenges/array_element_taint.ctc",
+      "challenges/guarded_and_checked.ctc",
+      "challenges/multiple_sources_two_sinks.ctc",
+      "challenges/loop_carried.ctc",
+      "unsupported/switch_statement.ctc",
+      "unsupported/preprocessor_directive.ctc",
+      "unsupported/pointer_type.ctc",
+      "syntax_errors/missing_semicolon.ctc",
+      "syntax_errors/unbalanced_braces.ctc",
+      "syntax_errors/broken_expression.ctc",
+      "custom_rules/custom_rule_demo.ctc",
+      "challenges/decoy_in_comment_and_string.ctc",
+      "challenges/negated_validator_guard.ctc",
+      "challenges/shadowed_variable.ctc",
+      "safe/killed_by_constant.ctc"
+    ]
+  },
+  "totals": {
+    "cases_passed": 33,
+    "cases_failed": 0,
+    "expected_findings": 20,
+    "reported_findings": 20,
+    "true_positives": 20,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "file_level_true_negatives": 9,
+    "file_level_false_positives": 0,
+    "cases_with_diagnostic_mismatch": []
+  },
+  "metrics": {
+    "precision": 1.0,
+    "precision_note": "",
+    "recall": 1.0,
+    "recall_note": "",
+    "f1": 1.0,
+    "f1_note": ""
+  },
+  "cases": [
+    {
+      "file": "vulnerable/command_injection.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "FEF13A28F7E0E",
+          "rule_id": "command_execution",
+          "flow_id": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "confidence": "medium",
+          "certainty": "approximate",
+          "sink": {
+            "rule": "command_system",
+            "function": "system",
+            "category": "command-injection",
+            "severity": "HIGH",
+            "context": "command",
+            "argument_index": 0,
+            "description": "executes its argument through the system command interpreter",
+            "sid": 3,
+            "line": 10,
+            "col": 10,
+            "statement_text": "system(command);",
+            "enclosing_function": "main",
+            "block": 2,
+            "expression": "command"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 8,
+            "col": 17,
+            "sid": 1,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": true,
+          "explanation": "Potential command injection flow detected: data introduced at line 8 (input) reaches argument 0 of system() at line 10, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 7 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 8) -> 'name' is assigned a tainted value at line 8 (line 8) -> argument 0 of the call to build_command() is tainted (line 9) -> 'user_input' is a parameter of build_command() (line 3) -> build_command() returns a tainted value (line 4) -> call to build_command() propagates taint to the caller (line 9) -> 'command' is assigned a tainted value at line 9 (line 9). The flow crosses at least one function boundary, so the interprocedural summary was used. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. Analysis certainty: approximate. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "Interprocedural reasoning is context-insensitive: parameters are summarised across all call sites, which can add flows that a single call site cannot actually create.",
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@command"
+            ],
+            "flow_rule": {
+              "id": "command_execution",
+              "kind": "flow",
+              "description": "untrusted data reaches a command execution operation",
+              "severity": "HIGH",
+              "category": "command-injection",
+              "sources": [
+                "stdin",
+                "stdin_int",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "command_system",
+                "command_exec",
+                "command_popen"
+              ],
+              "sanitizers": [
+                "shell_escape",
+                "parse_to_int",
+                "validate_command"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 171,
+              "col": 1
+            },
+            "sink_statement_span": [
+              299,
+              315
+            ]
+          },
+          "statement_ids": [
+            1,
+            1,
+            2,
+            0,
+            2,
+            2,
+            3
+          ],
+          "path_atoms": [
+            "src:stdin@command"
+          ],
+          "path_length": 8
+        }
+      ],
+      "reported_rules": [
+        "command_execution"
+      ],
+      "expectations": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(command);",
+          "source_rule": "stdin"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.812415,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 5,
+        "cfg_blocks": 4,
+        "dependency_edges": 7,
+        "taint_iterations": 4,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "vulnerable/sql_injection.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "F98D7F85D9F8D",
+          "rule_id": "sql_injection",
+          "flow_id": "sql_injection",
+          "category": "sql-injection",
+          "severity": "CRITICAL",
+          "confidence": "high",
+          "certainty": "confirmed",
+          "sink": {
+            "rule": "sql_exec",
+            "function": "sql_exec",
+            "category": "sql-injection",
+            "severity": "CRITICAL",
+            "context": "sql",
+            "argument_index": 0,
+            "description": "executes its argument as a database query",
+            "sid": 2,
+            "line": 5,
+            "col": 12,
+            "statement_text": "sql_exec(query);",
+            "enclosing_function": "main",
+            "block": 0,
+            "expression": "query"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 3,
+            "col": 17,
+            "sid": 0,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": false,
+          "explanation": "Potential sql injection flow detected: data introduced at line 3 (input) reaches argument 0 of sql_exec() at line 5, which rule 'sql_exec' classifies as a 'sql' context operation. The taint engine propagated the atom(s) src:stdin@sql along 3 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 3) -> 'user' is assigned a tainted value at line 3 (line 3) -> 'query' is assigned a tainted value at line 4 (line 4). The flow is intraprocedural. The flow rule 'sql_injection' connects source 'stdin' to sink 'sql_exec' and lists sanitizers sql_escape, parse_to_int; none of them removed the atoms that reached this sink. Analysis certainty: confirmed. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Use parameterised queries instead of building SQL text from untrusted input. If text concatenation is unavoidable, escape it for the SQL context with the 'sql_escape' rule.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@sql"
+            ],
+            "flow_rule": {
+              "id": "sql_injection",
+              "kind": "flow",
+              "description": "untrusted data reaches a database query",
+              "severity": "CRITICAL",
+              "category": "sql-injection",
+              "sources": [
+                "stdin",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "sql_exec"
+              ],
+              "sanitizers": [
+                "sql_escape",
+                "parse_to_int"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 181,
+              "col": 1
+            },
+            "sink_statement_span": [
+              183,
+              199
+            ]
+          },
+          "statement_ids": [
+            0,
+            0,
+            1,
+            2
+          ],
+          "path_atoms": [
+            "src:stdin@sql"
+          ],
+          "path_length": 4
+        }
+      ],
+      "reported_rules": [
+        "sql_injection"
+      ],
+      "expectations": [
+        {
+          "rule": "sql_injection",
+          "category": "sql-injection",
+          "severity": "CRITICAL",
+          "sink_statement": "sql_exec(query);",
+          "source_rule": "stdin"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.010235,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 4,
+        "cfg_blocks": 2,
+        "dependency_edges": 4,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "vulnerable/path_traversal.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "F2941F2C8306D",
+          "rule_id": "path_traversal",
+          "flow_id": "path_traversal",
+          "category": "path-traversal",
+          "severity": "HIGH",
+          "confidence": "high",
+          "certainty": "confirmed",
+          "sink": {
+            "rule": "path_readfile",
+            "function": "readfile",
+            "category": "path-traversal",
+            "severity": "HIGH",
+            "context": "path",
+            "argument_index": 0,
+            "description": "reads a filesystem path; an attacker controlled path allows traversal",
+            "sid": 2,
+            "line": 5,
+            "col": 30,
+            "statement_text": "string contents = readfile(path);",
+            "enclosing_function": "main",
+            "block": 0,
+            "expression": "path"
+          },
+          "source": {
+            "rule": "command_line",
+            "function": "argv",
+            "description": "a command line argument supplied when the program was started",
+            "line": 3,
+            "col": 22,
+            "sid": 0,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": false,
+          "explanation": "Potential path traversal flow detected: data introduced at line 3 (argv) reaches argument 0 of readfile() at line 5, which rule 'path_readfile' classifies as a 'path' context operation. The taint engine propagated the atom(s) src:command_line@path along 3 recorded step(s): argv() introduces untrusted data (source rule 'command_line') (line 3) -> 'requested' is assigned a tainted value at line 3 (line 3) -> 'path' is assigned a tainted value at line 4 (line 4). The flow is intraprocedural. The flow rule 'path_traversal' connects source 'command_line' to sink 'path_readfile' and lists sanitizers path_normalize, parse_to_int, validate_path; none of them removed the atoms that reached this sink. Analysis certainty: confirmed. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Resolve the path against a fixed base directory, reject '..' components after normalisation (the 'path_normalize' rule models this) and verify the result stays inside the permitted directory.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:command_line@path"
+            ],
+            "flow_rule": {
+              "id": "path_traversal",
+              "kind": "flow",
+              "description": "untrusted data reaches a filesystem path",
+              "severity": "HIGH",
+              "category": "path-traversal",
+              "sources": [
+                "stdin",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "path_fopen",
+                "path_readfile",
+                "path_writefile"
+              ],
+              "sanitizers": [
+                "path_normalize",
+                "parse_to_int",
+                "validate_path"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 191,
+              "col": 1
+            },
+            "sink_statement_span": [
+              134,
+              167
+            ]
+          },
+          "statement_ids": [
+            0,
+            0,
+            1,
+            2
+          ],
+          "path_atoms": [
+            "src:command_line@path"
+          ],
+          "path_length": 4
+        }
+      ],
+      "reported_rules": [
+        "path_traversal"
+      ],
+      "expectations": [
+        {
+          "rule": "path_traversal",
+          "category": "path-traversal",
+          "severity": "HIGH",
+          "sink_statement": "string contents = readfile(path);",
+          "source_rule": "command_line"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.010428,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 5,
+        "cfg_blocks": 2,
+        "dependency_edges": 6,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "vulnerable/format_string.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "F25F0824B292E",
+          "rule_id": "format_string",
+          "flow_id": "format_string",
+          "category": "format-string",
+          "severity": "MEDIUM",
+          "confidence": "high",
+          "certainty": "confirmed",
+          "sink": {
+            "rule": "format_printf",
+            "function": "printf",
+            "category": "format-string",
+            "severity": "MEDIUM",
+            "context": "format",
+            "argument_index": 0,
+            "description": "interprets its first argument as a format string",
+            "sid": 1,
+            "line": 4,
+            "col": 10,
+            "statement_text": "printf(format);",
+            "enclosing_function": "main",
+            "block": 0,
+            "expression": "format"
+          },
+          "source": {
+            "rule": "environment",
+            "function": "readenv",
+            "description": "an environment variable, which may be set by the caller of the program",
+            "line": 3,
+            "col": 19,
+            "sid": 0,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": false,
+          "explanation": "Potential format string flow detected: data introduced at line 3 (readenv) reaches argument 0 of printf() at line 4, which rule 'format_printf' classifies as a 'format' context operation. The taint engine propagated the atom(s) src:environment@format along 2 recorded step(s): readenv() introduces untrusted data (source rule 'environment') (line 3) -> 'format' is assigned a tainted value at line 3 (line 3). The flow is intraprocedural. The flow rule 'format_string' connects source 'environment' to sink 'format_printf' and lists sanitizers parse_to_int; none of them removed the atoms that reached this sink. Analysis certainty: confirmed. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Never pass untrusted data as the format string; use a constant format such as 'printf(\"%s\", value)' and pass the data as an argument.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:environment@format"
+            ],
+            "flow_rule": {
+              "id": "format_string",
+              "kind": "flow",
+              "description": "untrusted data is used as a format string",
+              "severity": "MEDIUM",
+              "category": "format-string",
+              "sources": [
+                "stdin",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "format_printf"
+              ],
+              "sanitizers": [
+                "parse_to_int"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 201,
+              "col": 1
+            },
+            "sink_statement_span": [
+              103,
+              118
+            ]
+          },
+          "statement_ids": [
+            0,
+            0,
+            1
+          ],
+          "path_atoms": [
+            "src:environment@format"
+          ],
+          "path_length": 3
+        }
+      ],
+      "reported_rules": [
+        "format_string"
+      ],
+      "expectations": [
+        {
+          "rule": "format_string",
+          "category": "format-string",
+          "severity": "MEDIUM",
+          "sink_statement": "printf(format);",
+          "source_rule": "environment"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.011262,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 3,
+        "cfg_blocks": 2,
+        "dependency_edges": 2,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "vulnerable/two_step_command.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "FB8395D388F26",
+          "rule_id": "command_execution",
+          "flow_id": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "confidence": "high",
+          "certainty": "confirmed",
+          "sink": {
+            "rule": "command_system",
+            "function": "system",
+            "category": "command-injection",
+            "severity": "HIGH",
+            "context": "command",
+            "argument_index": 0,
+            "description": "executes its argument through the system command interpreter",
+            "sid": 3,
+            "line": 6,
+            "col": 10,
+            "statement_text": "system(step_three);",
+            "enclosing_function": "main",
+            "block": 0,
+            "expression": "step_three"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 3,
+            "col": 21,
+            "sid": 0,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": false,
+          "explanation": "Potential command injection flow detected: data introduced at line 3 (input) reaches argument 0 of system() at line 6, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 4 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 3) -> 'step_one' is assigned a tainted value at line 3 (line 3) -> 'step_two' is assigned a tainted value at line 4 (line 4) -> 'step_three' is assigned a tainted value at line 5 (line 5). The flow is intraprocedural. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. Analysis certainty: confirmed. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@command"
+            ],
+            "flow_rule": {
+              "id": "command_execution",
+              "kind": "flow",
+              "description": "untrusted data reaches a command execution operation",
+              "severity": "HIGH",
+              "category": "command-injection",
+              "sources": [
+                "stdin",
+                "stdin_int",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "command_system",
+                "command_exec",
+                "command_popen"
+              ],
+              "sanitizers": [
+                "shell_escape",
+                "parse_to_int",
+                "validate_command"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 171,
+              "col": 1
+            },
+            "sink_statement_span": [
+              186,
+              205
+            ]
+          },
+          "statement_ids": [
+            0,
+            0,
+            1,
+            2,
+            3
+          ],
+          "path_atoms": [
+            "src:stdin@command"
+          ],
+          "path_length": 5
+        }
+      ],
+      "reported_rules": [
+        "command_execution"
+      ],
+      "expectations": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(step_three);",
+          "source_rule": "stdin"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.010342,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 5,
+        "cfg_blocks": 2,
+        "dependency_edges": 6,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "safe/constant_command.ctc",
+      "label": "safe",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": true,
+      "file_level_false_positive": false,
+      "seconds": 0.008822,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 3,
+        "cfg_blocks": 2,
+        "dependency_edges": 2,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "safe/unrelated_variable.ctc",
+      "label": "safe",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": true,
+      "file_level_false_positive": false,
+      "seconds": 0.009396,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 5,
+        "cfg_blocks": 2,
+        "dependency_edges": 4,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "safe/source_never_reaches_sink.ctc",
+      "label": "safe",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": true,
+      "file_level_false_positive": false,
+      "seconds": 0.013761,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 4,
+        "cfg_blocks": 2,
+        "dependency_edges": 3,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "safe/dead_branch_sink.ctc",
+      "label": "safe",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [
+        "SEM102"
+      ],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": true,
+      "file_level_false_positive": false,
+      "seconds": 0.009328,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 4,
+        "cfg_blocks": 4,
+        "dependency_edges": 3,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "sanitized/shell_escape.ctc",
+      "label": "sanitized",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": true,
+      "file_level_false_positive": false,
+      "seconds": 0.009558,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 4,
+        "cfg_blocks": 2,
+        "dependency_edges": 5,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "sanitized/sql_escape.ctc",
+      "label": "sanitized",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": true,
+      "file_level_false_positive": false,
+      "seconds": 0.011301,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 4,
+        "cfg_blocks": 2,
+        "dependency_edges": 5,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "sanitized/parse_to_int.ctc",
+      "label": "sanitized",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": true,
+      "file_level_false_positive": false,
+      "seconds": 0.009673,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 5,
+        "cfg_blocks": 2,
+        "dependency_edges": 7,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "sanitized/validated_command.ctc",
+      "label": "sanitized",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": true,
+      "file_level_false_positive": false,
+      "seconds": 0.009655,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 4,
+        "cfg_blocks": 4,
+        "dependency_edges": 5,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "interprocedural/return_value.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "FEF13A28F7E0E",
+          "rule_id": "command_execution",
+          "flow_id": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "confidence": "medium",
+          "certainty": "approximate",
+          "sink": {
+            "rule": "command_system",
+            "function": "system",
+            "category": "command-injection",
+            "severity": "HIGH",
+            "context": "command",
+            "argument_index": 0,
+            "description": "executes its argument through the system command interpreter",
+            "sid": 3,
+            "line": 9,
+            "col": 10,
+            "statement_text": "system(command);",
+            "enclosing_function": "main",
+            "block": 2,
+            "expression": "command"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 7,
+            "col": 17,
+            "sid": 1,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": true,
+          "explanation": "Potential command injection flow detected: data introduced at line 7 (input) reaches argument 0 of system() at line 9, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 7 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 7) -> 'name' is assigned a tainted value at line 7 (line 7) -> argument 0 of the call to identity() is tainted (line 8) -> 'value' is a parameter of identity() (line 2) -> identity() returns a tainted value (line 3) -> call to identity() propagates taint to the caller (line 8) -> 'command' is assigned a tainted value at line 8 (line 8). The flow crosses at least one function boundary, so the interprocedural summary was used. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. Analysis certainty: approximate. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "Interprocedural reasoning is context-insensitive: parameters are summarised across all call sites, which can add flows that a single call site cannot actually create.",
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@command"
+            ],
+            "flow_rule": {
+              "id": "command_execution",
+              "kind": "flow",
+              "description": "untrusted data reaches a command execution operation",
+              "severity": "HIGH",
+              "category": "command-injection",
+              "sources": [
+                "stdin",
+                "stdin_int",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "command_system",
+                "command_exec",
+                "command_popen"
+              ],
+              "sanitizers": [
+                "shell_escape",
+                "parse_to_int",
+                "validate_command"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 171,
+              "col": 1
+            },
+            "sink_statement_span": [
+              193,
+              209
+            ]
+          },
+          "statement_ids": [
+            1,
+            1,
+            2,
+            0,
+            2,
+            2,
+            3
+          ],
+          "path_atoms": [
+            "src:stdin@command"
+          ],
+          "path_length": 8
+        }
+      ],
+      "reported_rules": [
+        "command_execution"
+      ],
+      "expectations": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(command);",
+          "source_rule": "stdin"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.011289,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 5,
+        "cfg_blocks": 4,
+        "dependency_edges": 7,
+        "taint_iterations": 4,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "interprocedural/argument_flow.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "F4EBDDDDCAD7C",
+          "rule_id": "command_execution",
+          "flow_id": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "confidence": "low",
+          "certainty": "unproven",
+          "sink": {
+            "rule": "command_system",
+            "function": "system",
+            "category": "command-injection",
+            "severity": "HIGH",
+            "context": "command",
+            "argument_index": 0,
+            "description": "executes its argument through the system command interpreter",
+            "sid": 0,
+            "line": 3,
+            "col": 17,
+            "statement_text": "return system(command);",
+            "enclosing_function": "run_command",
+            "block": 0,
+            "expression": "command"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 0,
+            "col": 0,
+            "sid": -1,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": true,
+          "explanation": "Potential command injection flow detected: data introduced at an origin that could not be resolved reaches argument 0 of system() at line 3, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 8 recorded step(s): 'name' is assigned a tainted value at line 11 (line 11) -> argument 0 of the call to wrap() is tainted (line 12) -> 'value' is a parameter of wrap() (line 6) -> wrap() returns a tainted value (line 7) -> call to wrap() propagates taint to the caller (line 12) -> 'command' is assigned a tainted value at line 12 (line 12) -> argument 0 of the call to run_command() is tainted (line 13) -> 'command' is a parameter of run_command() (line 2). The flow crosses at least one function boundary, so the interprocedural summary was used. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. Analysis certainty: unproven. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "Interprocedural reasoning is context-insensitive: parameters are summarised across all call sites, which can add flows that a single call site cannot actually create.",
+            "The recorded path does not reach a configured source: the origin of the taint could not be established from this file (it may come from a caller, a file-scope variable or an unmodelled construct).",
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@command"
+            ],
+            "flow_rule": {
+              "id": "command_execution",
+              "kind": "flow",
+              "description": "untrusted data reaches a command execution operation",
+              "severity": "HIGH",
+              "category": "command-injection",
+              "sources": [
+                "stdin",
+                "stdin_int",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "command_system",
+                "command_exec",
+                "command_popen"
+              ],
+              "sanitizers": [
+                "shell_escape",
+                "parse_to_int",
+                "validate_command"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 171,
+              "col": 1
+            },
+            "sink_statement_span": [
+              120,
+              143
+            ]
+          },
+          "statement_ids": [
+            2,
+            3,
+            1,
+            3,
+            3,
+            4,
+            0
+          ],
+          "path_atoms": [
+            "src:stdin@command"
+          ],
+          "path_length": 9
+        }
+      ],
+      "reported_rules": [
+        "command_execution"
+      ],
+      "expectations": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "return system(command);",
+          "source_rule": "stdin"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.012129,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 6,
+        "cfg_blocks": 6,
+        "dependency_edges": 10,
+        "taint_iterations": 4,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "interprocedural/recursion.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "FEF13A28F7E0E",
+          "rule_id": "command_execution",
+          "flow_id": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "confidence": "medium",
+          "certainty": "approximate",
+          "sink": {
+            "rule": "command_system",
+            "function": "system",
+            "category": "command-injection",
+            "severity": "HIGH",
+            "context": "command",
+            "argument_index": 0,
+            "description": "executes its argument through the system command interpreter",
+            "sid": 5,
+            "line": 12,
+            "col": 10,
+            "statement_text": "system(command);",
+            "enclosing_function": "main",
+            "block": 4,
+            "expression": "command"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 10,
+            "col": 17,
+            "sid": 3,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [
+            {
+              "line": 3,
+              "col": 3,
+              "sid": 0,
+              "guarded_sid": 1,
+              "condition": "times <= 0",
+              "kind": "if",
+              "feasibility": "not-evaluated",
+              "note": "the condition was not evaluated: CodeTrace records the guard but does not decide whether it holds at run time"
+            }
+          ],
+          "feasibility": "guarded",
+          "feasibility_note": "1 branch condition(s) guard the reported path (1 of them were not evaluated). The data flow is established by a may-analysis; whether the guards hold at run time was not decided, because CodeTrace does not perform symbolic execution.",
+          "interprocedural": true,
+          "explanation": "Potential command injection flow detected: data introduced at line 10 (input) reaches argument 0 of system() at line 12, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 9 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 10) -> 'name' is assigned a tainted value at line 10 (line 10) -> argument 0 of the call to repeat() is tainted (line 11) -> 'value' is a parameter of repeat() (line 2) -> repeat() returns a tainted value (line 4) -> call to repeat() propagates taint to the caller (line 6) -> repeat() returns a tainted value (line 6) -> call to repeat() propagates taint to the caller (line 11) -> 'command' is assigned a tainted value at line 11 (line 11). The flow crosses at least one function boundary, so the interprocedural summary was used. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. 1 branch condition(s) guard this path: 'times <= 0' at line 3 (if, not-evaluated). Whether they hold at run time was not decided. Analysis certainty: approximate. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "Interprocedural reasoning is context-insensitive: parameters are summarised across all call sites, which can add flows that a single call site cannot actually create.",
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@command"
+            ],
+            "flow_rule": {
+              "id": "command_execution",
+              "kind": "flow",
+              "description": "untrusted data reaches a command execution operation",
+              "severity": "HIGH",
+              "category": "command-injection",
+              "sources": [
+                "stdin",
+                "stdin_int",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "command_system",
+                "command_exec",
+                "command_popen"
+              ],
+              "sanitizers": [
+                "shell_escape",
+                "parse_to_int",
+                "validate_command"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 171,
+              "col": 1
+            },
+            "sink_statement_span": [
+              288,
+              304
+            ]
+          },
+          "statement_ids": [
+            3,
+            3,
+            4,
+            1,
+            2,
+            2,
+            4,
+            4,
+            5
+          ],
+          "path_atoms": [
+            "src:stdin@command"
+          ],
+          "path_length": 10
+        }
+      ],
+      "reported_rules": [
+        "command_execution"
+      ],
+      "expectations": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(command);",
+          "source_rule": "stdin",
+          "certainty": "approximate"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.013183,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 7,
+        "cfg_blocks": 6,
+        "dependency_edges": 15,
+        "taint_iterations": 4,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "challenges/wrong_context_sanitizer.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "F632AF110750A",
+          "rule_id": "sql_injection",
+          "flow_id": "sql_injection",
+          "category": "sql-injection",
+          "severity": "CRITICAL",
+          "confidence": "high",
+          "certainty": "confirmed",
+          "sink": {
+            "rule": "sql_exec",
+            "function": "sql_exec",
+            "category": "sql-injection",
+            "severity": "CRITICAL",
+            "context": "sql",
+            "argument_index": 0,
+            "description": "executes its argument as a database query",
+            "sid": 3,
+            "line": 6,
+            "col": 12,
+            "statement_text": "sql_exec(name);",
+            "enclosing_function": "main",
+            "block": 0,
+            "expression": "name"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 3,
+            "col": 17,
+            "sid": 0,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": false,
+          "explanation": "Potential sql injection flow detected: data introduced at line 3 (input) reaches argument 0 of sql_exec() at line 6, which rule 'sql_exec' classifies as a 'sql' context operation. The taint engine propagated the atom(s) src:stdin@sql along 2 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 3) -> 'name' is assigned a tainted value at line 3 (line 3). The flow is intraprocedural. The flow rule 'sql_injection' connects source 'stdin' to sink 'sql_exec' and lists sanitizers sql_escape, parse_to_int; none of them removed the atoms that reached this sink. Analysis certainty: confirmed. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Use parameterised queries instead of building SQL text from untrusted input. If text concatenation is unavoidable, escape it for the SQL context with the 'sql_escape' rule.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@sql"
+            ],
+            "flow_rule": {
+              "id": "sql_injection",
+              "kind": "flow",
+              "description": "untrusted data reaches a database query",
+              "severity": "CRITICAL",
+              "category": "sql-injection",
+              "sources": [
+                "stdin",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "sql_exec"
+              ],
+              "sanitizers": [
+                "sql_escape",
+                "parse_to_int"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 181,
+              "col": 1
+            },
+            "sink_statement_span": [
+              206,
+              221
+            ]
+          },
+          "statement_ids": [
+            0,
+            0,
+            3
+          ],
+          "path_atoms": [
+            "src:stdin@sql"
+          ],
+          "path_length": 3
+        },
+        {
+          "id": "FD46BC50AABCD",
+          "rule_id": "command_execution",
+          "flow_id": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "confidence": "high",
+          "certainty": "confirmed",
+          "sink": {
+            "rule": "command_system",
+            "function": "system",
+            "category": "command-injection",
+            "severity": "HIGH",
+            "context": "command",
+            "argument_index": 0,
+            "description": "executes its argument through the system command interpreter",
+            "sid": 2,
+            "line": 5,
+            "col": 10,
+            "statement_text": "system(quoted);",
+            "enclosing_function": "main",
+            "block": 0,
+            "expression": "quoted"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 3,
+            "col": 17,
+            "sid": 0,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [
+            {
+              "rule": "sql_escape",
+              "context": "sql",
+              "detail": "the rule 'sql_escape' removes taint atoms for context 'sql'; atoms of other contexts survive",
+              "line": 4
+            }
+          ],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": false,
+          "explanation": "Potential command injection flow detected: data introduced at line 3 (input) reaches argument 0 of system() at line 5, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 4 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 3) -> 'name' is assigned a tainted value at line 3 (line 3) -> sql_escape() applied (sanitizer for context 'sql') (line 4) -> 'quoted' is assigned a tainted value at line 4 (line 4). The flow is intraprocedural. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. Analysis certainty: confirmed. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "A sanitizer rule appears on the reported path but does not neutralise the reported value: it covers a different context, or the taint entered through an argument the rule does not sanitise. The flow is reported conservatively.",
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@command"
+            ],
+            "flow_rule": {
+              "id": "command_execution",
+              "kind": "flow",
+              "description": "untrusted data reaches a command execution operation",
+              "severity": "HIGH",
+              "category": "command-injection",
+              "sources": [
+                "stdin",
+                "stdin_int",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "command_system",
+                "command_exec",
+                "command_popen"
+              ],
+              "sanitizers": [
+                "shell_escape",
+                "parse_to_int",
+                "validate_command"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 171,
+              "col": 1
+            },
+            "sink_statement_span": [
+              188,
+              203
+            ]
+          },
+          "statement_ids": [
+            0,
+            0,
+            1,
+            1,
+            2
+          ],
+          "path_atoms": [
+            "src:stdin@command"
+          ],
+          "path_length": 5
+        }
+      ],
+      "reported_rules": [
+        "command_execution",
+        "sql_injection"
+      ],
+      "expectations": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(quoted);",
+          "source_rule": "stdin"
+        },
+        {
+          "rule": "sql_injection",
+          "category": "sql-injection",
+          "severity": "CRITICAL",
+          "sink_statement": "sql_exec(name);",
+          "source_rule": "stdin"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 2,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.010343,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 5,
+        "cfg_blocks": 2,
+        "dependency_edges": 6,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "challenges/unknown_external_keeps_taint.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "FB2D9BBC237CA",
+          "rule_id": "command_execution",
+          "flow_id": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "confidence": "medium",
+          "certainty": "approximate",
+          "sink": {
+            "rule": "command_system",
+            "function": "system",
+            "category": "command-injection",
+            "severity": "HIGH",
+            "context": "command",
+            "argument_index": 0,
+            "description": "executes its argument through the system command interpreter",
+            "sid": 2,
+            "line": 5,
+            "col": 10,
+            "statement_text": "system(processed);",
+            "enclosing_function": "main",
+            "block": 0,
+            "expression": "processed"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 3,
+            "col": 17,
+            "sid": 0,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": false,
+          "explanation": "Potential command injection flow detected: data introduced at line 3 (input) reaches argument 0 of system() at line 5, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 4 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 3) -> 'name' is assigned a tainted value at line 3 (line 3) -> transform_unknown() is not modelled; taint is propagated conservatively (line 4) -> 'processed' is assigned a tainted value at line 4 (line 4). The flow is intraprocedural. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. Analysis certainty: approximate. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "The path passes through a function that is not modelled, so the analysis assumes its result depends on its arguments instead of proving it.",
+            "1 value(s) in this file have an unknown type or shape and are treated conservatively.",
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@command"
+            ],
+            "flow_rule": {
+              "id": "command_execution",
+              "kind": "flow",
+              "description": "untrusted data reaches a command execution operation",
+              "severity": "HIGH",
+              "category": "command-injection",
+              "sources": [
+                "stdin",
+                "stdin_int",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "command_system",
+                "command_exec",
+                "command_popen"
+              ],
+              "sanitizers": [
+                "shell_escape",
+                "parse_to_int",
+                "validate_command"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 171,
+              "col": 1
+            },
+            "sink_statement_span": [
+              169,
+              187
+            ]
+          },
+          "statement_ids": [
+            0,
+            0,
+            1,
+            1,
+            2
+          ],
+          "path_atoms": [
+            "src:stdin@command"
+          ],
+          "path_length": 5
+        }
+      ],
+      "reported_rules": [
+        "command_execution"
+      ],
+      "expectations": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(processed);",
+          "source_rule": "stdin"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [
+        "SEM008"
+      ],
+      "expected_diagnostic_codes": [
+        "SEM008"
+      ],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.009605,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 4,
+        "cfg_blocks": 2,
+        "dependency_edges": 4,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "challenges/array_element_taint.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "FEB80B4DF263A",
+          "rule_id": "command_execution",
+          "flow_id": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "confidence": "high",
+          "certainty": "confirmed",
+          "sink": {
+            "rule": "command_system",
+            "function": "system",
+            "category": "command-injection",
+            "severity": "HIGH",
+            "context": "command",
+            "argument_index": 0,
+            "description": "executes its argument through the system command interpreter",
+            "sid": 3,
+            "line": 6,
+            "col": 10,
+            "statement_text": "system(parts[0]);",
+            "enclosing_function": "main",
+            "block": 0,
+            "expression": "parts[...]"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 4,
+            "col": 14,
+            "sid": 1,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": false,
+          "explanation": "Potential command injection flow detected: data introduced at line 4 (input) reaches argument 0 of system() at line 6, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 3 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 4) -> 'parts[]' is assigned a tainted value at line 4 (line 4) -> 'parts[]' is assigned a tainted value at line 5 (line 5). The flow is intraprocedural. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. Analysis certainty: confirmed. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "3 value(s) in this file have an unknown type or shape and are treated conservatively.",
+            "Array elements are not tracked individually: taint assigned to any element taints the whole array, and indices are not proved to be in range.",
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@command"
+            ],
+            "flow_rule": {
+              "id": "command_execution",
+              "kind": "flow",
+              "description": "untrusted data reaches a command execution operation",
+              "severity": "HIGH",
+              "category": "command-injection",
+              "sources": [
+                "stdin",
+                "stdin_int",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "command_system",
+                "command_exec",
+                "command_popen"
+              ],
+              "sanitizers": [
+                "shell_escape",
+                "parse_to_int",
+                "validate_command"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 171,
+              "col": 1
+            },
+            "sink_statement_span": [
+              156,
+              173
+            ]
+          },
+          "statement_ids": [
+            1,
+            1,
+            2,
+            3
+          ],
+          "path_atoms": [
+            "src:stdin@command"
+          ],
+          "path_length": 4
+        }
+      ],
+      "reported_rules": [
+        "command_execution"
+      ],
+      "expectations": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(parts[0]);",
+          "source_rule": "stdin"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [
+        "DFA001"
+      ],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.009666,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 5,
+        "cfg_blocks": 2,
+        "dependency_edges": 6,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "challenges/guarded_and_checked.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "F7A64DC31F0A1",
+          "rule_id": "command_execution",
+          "flow_id": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "confidence": "medium",
+          "certainty": "approximate",
+          "sink": {
+            "rule": "command_system",
+            "function": "system",
+            "category": "command-injection",
+            "severity": "HIGH",
+            "context": "command",
+            "argument_index": 0,
+            "description": "executes its argument through the system command interpreter",
+            "sid": 2,
+            "line": 5,
+            "col": 12,
+            "statement_text": "system(name);",
+            "enclosing_function": "main",
+            "block": 3,
+            "expression": "name"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 3,
+            "col": 17,
+            "sid": 0,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [
+            {
+              "line": 4,
+              "col": 3,
+              "sid": 1,
+              "guarded_sid": 2,
+              "condition": "strlen(name) > 2",
+              "kind": "if",
+              "feasibility": "not-evaluated",
+              "note": "the condition was not evaluated: CodeTrace records the guard but does not decide whether it holds at run time"
+            }
+          ],
+          "feasibility": "guarded",
+          "feasibility_note": "1 branch condition(s) guard the reported path (1 of them were not evaluated). The data flow is established by a may-analysis; whether the guards hold at run time was not decided, because CodeTrace does not perform symbolic execution.",
+          "interprocedural": false,
+          "explanation": "Potential command injection flow detected: data introduced at line 3 (input) reaches argument 0 of system() at line 5, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 2 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 3) -> 'name' is assigned a tainted value at line 3 (line 3). The flow is intraprocedural. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. 1 branch condition(s) guard this path: 'strlen(name) > 2' at line 4 (if, not-evaluated). Whether they hold at run time was not decided. Analysis certainty: approximate. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@command"
+            ],
+            "flow_rule": {
+              "id": "command_execution",
+              "kind": "flow",
+              "description": "untrusted data reaches a command execution operation",
+              "severity": "HIGH",
+              "category": "command-injection",
+              "sources": [
+                "stdin",
+                "stdin_int",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "command_system",
+                "command_exec",
+                "command_popen"
+              ],
+              "sanitizers": [
+                "shell_escape",
+                "parse_to_int",
+                "validate_command"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 171,
+              "col": 1
+            },
+            "sink_statement_span": [
+              162,
+              175
+            ]
+          },
+          "statement_ids": [
+            0,
+            0,
+            2
+          ],
+          "path_atoms": [
+            "src:stdin@command"
+          ],
+          "path_length": 3
+        }
+      ],
+      "reported_rules": [
+        "command_execution"
+      ],
+      "expectations": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(name);",
+          "source_rule": "stdin"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.009943,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 4,
+        "cfg_blocks": 4,
+        "dependency_edges": 4,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "challenges/multiple_sources_two_sinks.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "F67777913EAAE",
+          "rule_id": "command_execution",
+          "flow_id": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "confidence": "high",
+          "certainty": "confirmed",
+          "sink": {
+            "rule": "command_system",
+            "function": "system",
+            "category": "command-injection",
+            "severity": "HIGH",
+            "context": "command",
+            "argument_index": 0,
+            "description": "executes its argument through the system command interpreter",
+            "sid": 2,
+            "line": 5,
+            "col": 10,
+            "statement_text": "system(from_stdin);",
+            "enclosing_function": "main",
+            "block": 0,
+            "expression": "from_stdin"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 3,
+            "col": 23,
+            "sid": 0,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": false,
+          "explanation": "Potential command injection flow detected: data introduced at line 3 (input) reaches argument 0 of system() at line 5, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 2 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 3) -> 'from_stdin' is assigned a tainted value at line 3 (line 3). The flow is intraprocedural. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. Analysis certainty: confirmed. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@command"
+            ],
+            "flow_rule": {
+              "id": "command_execution",
+              "kind": "flow",
+              "description": "untrusted data reaches a command execution operation",
+              "severity": "HIGH",
+              "category": "command-injection",
+              "sources": [
+                "stdin",
+                "stdin_int",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "command_system",
+                "command_exec",
+                "command_popen"
+              ],
+              "sanitizers": [
+                "shell_escape",
+                "parse_to_int",
+                "validate_command"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 171,
+              "col": 1
+            },
+            "sink_statement_span": [
+              166,
+              185
+            ]
+          },
+          "statement_ids": [
+            0,
+            0,
+            2
+          ],
+          "path_atoms": [
+            "src:stdin@command"
+          ],
+          "path_length": 3
+        },
+        {
+          "id": "FC3329021A7D9",
+          "rule_id": "path_traversal",
+          "flow_id": "path_traversal",
+          "category": "path-traversal",
+          "severity": "HIGH",
+          "confidence": "high",
+          "certainty": "confirmed",
+          "sink": {
+            "rule": "path_readfile",
+            "function": "readfile",
+            "category": "path-traversal",
+            "severity": "HIGH",
+            "context": "path",
+            "argument_index": 0,
+            "description": "reads a filesystem path; an attacker controlled path allows traversal",
+            "sid": 3,
+            "line": 6,
+            "col": 12,
+            "statement_text": "readfile(from_env);",
+            "enclosing_function": "main",
+            "block": 0,
+            "expression": "from_env"
+          },
+          "source": {
+            "rule": "environment",
+            "function": "readenv",
+            "description": "an environment variable, which may be set by the caller of the program",
+            "line": 4,
+            "col": 21,
+            "sid": 1,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": false,
+          "explanation": "Potential path traversal flow detected: data introduced at line 4 (readenv) reaches argument 0 of readfile() at line 6, which rule 'path_readfile' classifies as a 'path' context operation. The taint engine propagated the atom(s) src:environment@path along 2 recorded step(s): readenv() introduces untrusted data (source rule 'environment') (line 4) -> 'from_env' is assigned a tainted value at line 4 (line 4). The flow is intraprocedural. The flow rule 'path_traversal' connects source 'environment' to sink 'path_readfile' and lists sanitizers path_normalize, parse_to_int, validate_path; none of them removed the atoms that reached this sink. Analysis certainty: confirmed. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Resolve the path against a fixed base directory, reject '..' components after normalisation (the 'path_normalize' rule models this) and verify the result stays inside the permitted directory.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:environment@path"
+            ],
+            "flow_rule": {
+              "id": "path_traversal",
+              "kind": "flow",
+              "description": "untrusted data reaches a filesystem path",
+              "severity": "HIGH",
+              "category": "path-traversal",
+              "sources": [
+                "stdin",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "path_fopen",
+                "path_readfile",
+                "path_writefile"
+              ],
+              "sanitizers": [
+                "path_normalize",
+                "parse_to_int",
+                "validate_path"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 191,
+              "col": 1
+            },
+            "sink_statement_span": [
+              188,
+              207
+            ]
+          },
+          "statement_ids": [
+            1,
+            1,
+            3
+          ],
+          "path_atoms": [
+            "src:environment@path"
+          ],
+          "path_length": 3
+        }
+      ],
+      "reported_rules": [
+        "command_execution",
+        "path_traversal"
+      ],
+      "expectations": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(from_stdin);",
+          "source_rule": "stdin"
+        },
+        {
+          "rule": "path_traversal",
+          "category": "path-traversal",
+          "severity": "HIGH",
+          "sink_statement": "readfile(from_env);",
+          "source_rule": "environment"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 2,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.009969,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 5,
+        "cfg_blocks": 2,
+        "dependency_edges": 4,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "challenges/loop_carried.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "F1C646EE7623D",
+          "rule_id": "command_execution",
+          "flow_id": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "confidence": "medium",
+          "certainty": "approximate",
+          "sink": {
+            "rule": "command_system",
+            "function": "system",
+            "category": "command-injection",
+            "severity": "HIGH",
+            "context": "command",
+            "argument_index": 0,
+            "description": "executes its argument through the system command interpreter",
+            "sid": 5,
+            "line": 9,
+            "col": 10,
+            "statement_text": "system(value);",
+            "enclosing_function": "main",
+            "block": 3,
+            "expression": "value"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 3,
+            "col": 18,
+            "sid": 0,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [
+            {
+              "line": 5,
+              "col": 3,
+              "sid": 2,
+              "guarded_sid": 3,
+              "condition": "i < 3",
+              "kind": "while",
+              "feasibility": "not-evaluated",
+              "note": "the condition was not evaluated: CodeTrace records the guard but does not decide whether it holds at run time"
+            }
+          ],
+          "feasibility": "guarded",
+          "feasibility_note": "1 branch condition(s) guard the reported path (1 of them were not evaluated). The data flow is established by a may-analysis; whether the guards hold at run time was not decided, because CodeTrace does not perform symbolic execution.",
+          "interprocedural": false,
+          "explanation": "Potential command injection flow detected: data introduced at line 3 (input) reaches argument 0 of system() at line 9, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 6 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 3) -> 'value' is assigned a tainted value at line 3 (line 3) -> input() introduces untrusted data (source rule 'stdin') (line 3) -> 'value' is assigned a tainted value at line 3 (line 3) -> 'value' is assigned a tainted value at line 6 (line 6) -> 'value' is assigned a tainted value at line 6 (line 6). The flow is intraprocedural. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. 1 branch condition(s) guard this path: 'i < 3' at line 5 (while, not-evaluated). Whether they hold at run time was not decided. Analysis certainty: approximate. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@command"
+            ],
+            "flow_rule": {
+              "id": "command_execution",
+              "kind": "flow",
+              "description": "untrusted data reaches a command execution operation",
+              "severity": "HIGH",
+              "category": "command-injection",
+              "sources": [
+                "stdin",
+                "stdin_int",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "command_system",
+                "command_exec",
+                "command_popen"
+              ],
+              "sanitizers": [
+                "shell_escape",
+                "parse_to_int",
+                "validate_command"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 171,
+              "col": 1
+            },
+            "sink_statement_span": [
+              196,
+              210
+            ]
+          },
+          "statement_ids": [
+            0,
+            0,
+            0,
+            0,
+            3,
+            3,
+            5
+          ],
+          "path_atoms": [
+            "src:stdin@command"
+          ],
+          "path_length": 7
+        }
+      ],
+      "reported_rules": [
+        "command_execution"
+      ],
+      "expectations": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(value);",
+          "source_rule": "stdin"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.010891,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 7,
+        "cfg_blocks": 5,
+        "dependency_edges": 14,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "unsupported/switch_statement.ctc",
+      "label": "unsupported",
+      "accepted": false,
+      "analysis_ok": false,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [
+        "LEX100",
+        "LEX102",
+        "SYN100"
+      ],
+      "expected_diagnostic_codes": [
+        "LEX100",
+        "LEX102",
+        "SYN100"
+      ],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.009098,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 1,
+        "cfg_blocks": 2,
+        "dependency_edges": 1,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "unsupported/preprocessor_directive.ctc",
+      "label": "unsupported",
+      "accepted": true,
+      "analysis_ok": false,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [
+        "LEX101"
+      ],
+      "expected_diagnostic_codes": [
+        "LEX101"
+      ],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.008656,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 2,
+        "cfg_blocks": 2,
+        "dependency_edges": 0,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "unsupported/pointer_type.ctc",
+      "label": "unsupported",
+      "accepted": false,
+      "analysis_ok": false,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [
+        "SYN001"
+      ],
+      "expected_diagnostic_codes": [
+        "SYN001"
+      ],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.009567,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 3,
+        "cfg_blocks": 2,
+        "dependency_edges": 1,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "syntax_errors/missing_semicolon.ctc",
+      "label": "syntax_error",
+      "accepted": false,
+      "analysis_ok": false,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [
+        "SYN001"
+      ],
+      "expected_diagnostic_codes": [
+        "SYN001"
+      ],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.009154,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 2,
+        "cfg_blocks": 2,
+        "dependency_edges": 0,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "syntax_errors/unbalanced_braces.ctc",
+      "label": "syntax_error",
+      "accepted": false,
+      "analysis_ok": false,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [
+        "SEM020",
+        "SYN001"
+      ],
+      "expected_diagnostic_codes": [
+        "SYN001"
+      ],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.008286,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 0,
+        "cfg_blocks": 0,
+        "dependency_edges": 0,
+        "taint_iterations": 0,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "syntax_errors/broken_expression.ctc",
+      "label": "syntax_error",
+      "accepted": false,
+      "analysis_ok": false,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [
+        "SYN001"
+      ],
+      "expected_diagnostic_codes": [
+        "SYN001"
+      ],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.008864,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 2,
+        "cfg_blocks": 2,
+        "dependency_edges": 2,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "custom_rules/custom_rule_demo.ctc",
+      "label": "custom_rule",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "F5B9EB1A3DBDF",
+          "rule_id": "audit_injection",
+          "flow_id": "audit_injection",
+          "category": "arbitrary-file-write",
+          "severity": "MEDIUM",
+          "confidence": "high",
+          "certainty": "confirmed",
+          "sink": {
+            "rule": "audit_log",
+            "function": "audit_write",
+            "category": "arbitrary-file-write",
+            "severity": "MEDIUM",
+            "context": "path",
+            "argument_index": 0,
+            "description": "writes its argument into an audit log file",
+            "sid": 1,
+            "line": 5,
+            "col": 15,
+            "statement_text": "audit_write(body);",
+            "enclosing_function": "main",
+            "block": 0,
+            "expression": "body"
+          },
+          "source": {
+            "rule": "request_body",
+            "function": "http_body",
+            "description": "the body of an incoming HTTP request",
+            "line": 4,
+            "col": 17,
+            "sid": 0,
+            "contexts": [
+              "command",
+              "sql",
+              "path"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": false,
+          "explanation": "Potential arbitrary file write flow detected: data introduced at line 4 (http_body) reaches argument 0 of audit_write() at line 5, which rule 'audit_log' classifies as a 'path' context operation. The taint engine propagated the atom(s) src:request_body@path along 2 recorded step(s): http_body() introduces untrusted data (source rule 'request_body') (line 4) -> 'body' is assigned a tainted value at line 4 (line 4). The flow is intraprocedural. The flow rule 'audit_injection' connects source 'request_body' to sink 'audit_log' and lists sanitizers audit_escape; none of them removed the atoms that reached this sink. Analysis certainty: confirmed. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "2 value(s) in this file have an unknown type or shape and are treated conservatively.",
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Never derive the destination of a write from untrusted input. Use a fixed set of permitted paths or normalise and validate the value, then re-run the analysis.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-5da5d2e099f987e5",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:request_body@path"
+            ],
+            "flow_rule": {
+              "id": "audit_injection",
+              "kind": "flow",
+              "description": "an untrusted request body reaches the audit log writer",
+              "severity": "MEDIUM",
+              "category": "arbitrary-file-write",
+              "sources": [
+                "request_body"
+              ],
+              "sinks": [
+                "audit_log"
+              ],
+              "sanitizers": [
+                "audit_escape"
+              ],
+              "enabled": true,
+              "builtin": false,
+              "line": 28,
+              "col": 1
+            },
+            "sink_statement_span": [
+              173,
+              191
+            ]
+          },
+          "statement_ids": [
+            0,
+            0,
+            1
+          ],
+          "path_atoms": [
+            "src:request_body@path"
+          ],
+          "path_length": 3
+        }
+      ],
+      "reported_rules": [
+        "audit_injection"
+      ],
+      "expectations": [
+        {
+          "rule": "audit_injection",
+          "category": "arbitrary-file-write",
+          "severity": "MEDIUM",
+          "sink_statement": "audit_write(body);",
+          "source_rule": "request_body"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [
+        "SEM008"
+      ],
+      "expected_diagnostic_codes": [
+        "SEM008"
+      ],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.009919,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 5,
+        "cfg_blocks": 2,
+        "dependency_edges": 6,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "challenges/decoy_in_comment_and_string.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "FEF13A28F7E0E",
+          "rule_id": "command_execution",
+          "flow_id": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "confidence": "high",
+          "certainty": "confirmed",
+          "sink": {
+            "rule": "command_system",
+            "function": "system",
+            "category": "command-injection",
+            "severity": "HIGH",
+            "context": "command",
+            "argument_index": 0,
+            "description": "executes its argument through the system command interpreter",
+            "sid": 2,
+            "line": 7,
+            "col": 10,
+            "statement_text": "system(command);",
+            "enclosing_function": "main",
+            "block": 0,
+            "expression": "command"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 4,
+            "col": 20,
+            "sid": 0,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": false,
+          "explanation": "Potential command injection flow detected: data introduced at line 4 (input) reaches argument 0 of system() at line 7, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 2 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 4) -> 'command' is assigned a tainted value at line 4 (line 4). The flow is intraprocedural. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. Analysis certainty: confirmed. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@command"
+            ],
+            "flow_rule": {
+              "id": "command_execution",
+              "kind": "flow",
+              "description": "untrusted data reaches a command execution operation",
+              "severity": "HIGH",
+              "category": "command-injection",
+              "sources": [
+                "stdin",
+                "stdin_int",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "command_system",
+                "command_exec",
+                "command_popen"
+              ],
+              "sanitizers": [
+                "shell_escape",
+                "parse_to_int",
+                "validate_command"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 171,
+              "col": 1
+            },
+            "sink_statement_span": [
+              333,
+              349
+            ]
+          },
+          "statement_ids": [
+            0,
+            0,
+            2
+          ],
+          "path_atoms": [
+            "src:stdin@command"
+          ],
+          "path_length": 3
+        }
+      ],
+      "reported_rules": [
+        "command_execution"
+      ],
+      "expectations": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(command);",
+          "source_rule": "stdin"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.009713,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 4,
+        "cfg_blocks": 2,
+        "dependency_edges": 3,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "challenges/negated_validator_guard.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "F7A64DC31F0A1",
+          "rule_id": "command_execution",
+          "flow_id": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "confidence": "medium",
+          "certainty": "approximate",
+          "sink": {
+            "rule": "command_system",
+            "function": "system",
+            "category": "command-injection",
+            "severity": "HIGH",
+            "context": "command",
+            "argument_index": 0,
+            "description": "executes its argument through the system command interpreter",
+            "sid": 2,
+            "line": 5,
+            "col": 12,
+            "statement_text": "system(name);",
+            "enclosing_function": "main",
+            "block": 3,
+            "expression": "name"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 3,
+            "col": 17,
+            "sid": 0,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [
+            {
+              "line": 4,
+              "col": 3,
+              "sid": 1,
+              "guarded_sid": 2,
+              "condition": "!is_safe_command(name)",
+              "kind": "if",
+              "feasibility": "not-evaluated",
+              "note": "the condition was not evaluated: CodeTrace records the guard but does not decide whether it holds at run time"
+            }
+          ],
+          "feasibility": "guarded",
+          "feasibility_note": "1 branch condition(s) guard the reported path (1 of them were not evaluated). The data flow is established by a may-analysis; whether the guards hold at run time was not decided, because CodeTrace does not perform symbolic execution.",
+          "interprocedural": false,
+          "explanation": "Potential command injection flow detected: data introduced at line 3 (input) reaches argument 0 of system() at line 5, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 2 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 3) -> 'name' is assigned a tainted value at line 3 (line 3). The flow is intraprocedural. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. 1 branch condition(s) guard this path: '!is_safe_command(name)' at line 4 (if, not-evaluated). Whether they hold at run time was not decided. Analysis certainty: approximate. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@command"
+            ],
+            "flow_rule": {
+              "id": "command_execution",
+              "kind": "flow",
+              "description": "untrusted data reaches a command execution operation",
+              "severity": "HIGH",
+              "category": "command-injection",
+              "sources": [
+                "stdin",
+                "stdin_int",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "command_system",
+                "command_exec",
+                "command_popen"
+              ],
+              "sanitizers": [
+                "shell_escape",
+                "parse_to_int",
+                "validate_command"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 171,
+              "col": 1
+            },
+            "sink_statement_span": [
+              155,
+              168
+            ]
+          },
+          "statement_ids": [
+            0,
+            0,
+            2
+          ],
+          "path_atoms": [
+            "src:stdin@command"
+          ],
+          "path_length": 3
+        }
+      ],
+      "reported_rules": [
+        "command_execution"
+      ],
+      "expectations": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(name);",
+          "source_rule": "stdin"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.009845,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 4,
+        "cfg_blocks": 4,
+        "dependency_edges": 5,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "challenges/shadowed_variable.ctc",
+      "label": "vulnerable",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [
+        {
+          "id": "F7A64DC31F0A1",
+          "rule_id": "command_execution",
+          "flow_id": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "confidence": "high",
+          "certainty": "confirmed",
+          "sink": {
+            "rule": "command_system",
+            "function": "system",
+            "category": "command-injection",
+            "severity": "HIGH",
+            "context": "command",
+            "argument_index": 0,
+            "description": "executes its argument through the system command interpreter",
+            "sid": 3,
+            "line": 8,
+            "col": 10,
+            "statement_text": "system(name);",
+            "enclosing_function": "main",
+            "block": 0,
+            "expression": "name"
+          },
+          "source": {
+            "rule": "stdin",
+            "function": "input",
+            "description": "one line read from standard input; attacker controlled in most deployments",
+            "line": 3,
+            "col": 17,
+            "sid": 0,
+            "contexts": [
+              "command",
+              "sql",
+              "path",
+              "html",
+              "numeric",
+              "format"
+            ]
+          },
+          "sanitizers_seen": [],
+          "branch_conditions": [],
+          "feasibility": "unconditional",
+          "feasibility_note": "no branch condition guards the reported path; the path is structurally reachable from the entry of the enclosing function.",
+          "interprocedural": false,
+          "explanation": "Potential command injection flow detected: data introduced at line 3 (input) reaches argument 0 of system() at line 8, which rule 'command_system' classifies as a 'command' context operation. The taint engine propagated the atom(s) src:stdin@command along 2 recorded step(s): input() introduces untrusted data (source rule 'stdin') (line 3) -> 'name' is assigned a tainted value at line 3 (line 3). The flow is intraprocedural. The flow rule 'command_execution' connects source 'stdin' to sink 'command_system' and lists sanitizers shell_escape, parse_to_int, validate_command; none of them removed the atoms that reached this sink. Analysis certainty: confirmed. This is a static finding: exploitability was not established.",
+          "limitations": [
+            "The flow was detected by static analysis only; the analysed program was never executed and exploitability was not established."
+          ],
+          "remediation": "Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.",
+          "evidence": {
+            "engine_version": "1.0.0",
+            "rules_version": "builtin-3387b7dcd97a95f3",
+            "taint_engine": "context-insensitive, flow-sensitive may-analysis over the CFG",
+            "reaching_definitions": "used to justify each data-flow hop in the path",
+            "analyses": [
+              "lexer",
+              "canonical LR parser (LALR tables)",
+              "semantic analysis",
+              "control-flow graph",
+              "reaching definitions",
+              "liveness",
+              "definite assignment",
+              "taint propagation",
+              "program dependency graph"
+            ],
+            "atoms": [
+              "src:stdin@command"
+            ],
+            "flow_rule": {
+              "id": "command_execution",
+              "kind": "flow",
+              "description": "untrusted data reaches a command execution operation",
+              "severity": "HIGH",
+              "category": "command-injection",
+              "sources": [
+                "stdin",
+                "stdin_int",
+                "environment",
+                "command_line",
+                "file_content"
+              ],
+              "sinks": [
+                "command_system",
+                "command_exec",
+                "command_popen"
+              ],
+              "sanitizers": [
+                "shell_escape",
+                "parse_to_int",
+                "validate_command"
+              ],
+              "enabled": true,
+              "builtin": true,
+              "line": 171,
+              "col": 1
+            },
+            "sink_statement_span": [
+              179,
+              192
+            ]
+          },
+          "statement_ids": [
+            0,
+            0,
+            3
+          ],
+          "path_atoms": [
+            "src:stdin@command"
+          ],
+          "path_length": 3
+        }
+      ],
+      "reported_rules": [
+        "command_execution"
+      ],
+      "expectations": [
+        {
+          "rule": "command_execution",
+          "category": "command-injection",
+          "severity": "HIGH",
+          "sink_statement": "system(name);",
+          "source_rule": "stdin"
+        }
+      ],
+      "missing_expectations": [],
+      "diagnostic_codes": [
+        "SEM018"
+      ],
+      "expected_diagnostic_codes": [
+        "SEM018"
+      ],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 1,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": false,
+      "file_level_false_positive": false,
+      "seconds": 0.0098,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 5,
+        "cfg_blocks": 2,
+        "dependency_edges": 4,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    },
+    {
+      "file": "safe/killed_by_constant.ctc",
+      "label": "safe",
+      "accepted": true,
+      "analysis_ok": true,
+      "verdict": "pass",
+      "reasons": [],
+      "findings": [],
+      "reported_rules": [],
+      "expectations": [],
+      "missing_expectations": [],
+      "diagnostic_codes": [],
+      "expected_diagnostic_codes": [],
+      "missing_diagnostic_codes": [],
+      "unexpected_error_codes": [],
+      "true_positives": 0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "file_level_true_negative": true,
+      "file_level_false_positive": false,
+      "seconds": 0.009018,
+      "limits_hit": [],
+      "rule_diagnostics": [],
+      "metrics": {
+        "statements": 4,
+        "cfg_blocks": 2,
+        "dependency_edges": 3,
+        "taint_iterations": 2,
+        "taint_converged": true
+      }
+    }
+  ],
+  "interpretation": "These numbers describe the labelled corpus in this repository only. The corpus is small and hand-written, so the metrics are a regression signal for the analysis pipeline, not an estimate of real-world detection quality or of security."
+}

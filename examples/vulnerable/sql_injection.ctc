@@ -1,0 +1,7 @@
+// expect: 1 finding, rule sql_injection, CRITICAL, category sql-injection
+int main() {
+  string user = input();
+  string query = "SELECT * FROM users WHERE name = '" + user + "'";
+  sql_exec(query);
+  return 0;
+}

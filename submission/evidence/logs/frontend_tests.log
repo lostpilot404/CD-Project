@@ -1,0 +1,194 @@
+
+> codetrace-frontend@1.0.0 test
+> node --test "tests/*.test.js"
+
+TAP version 13
+# Subtest: lib/dom.js inserts text, never markup
+ok 1 - lib/dom.js inserts text, never markup
+  ---
+  duration_ms: 1.3354
+  type: 'test'
+  ...
+# Subtest: lib/dom.js sets attributes, classes, datasets and listeners
+ok 2 - lib/dom.js sets attributes, classes, datasets and listeners
+  ---
+  duration_ms: 0.628174
+  type: 'test'
+  ...
+# Subtest: lib/dom.js render replaces children and skips empty values
+ok 3 - lib/dom.js render replaces children and skips empty values
+  ---
+  duration_ms: 0.309293
+  type: 'test'
+  ...
+# Subtest: lib/filter.js facets, search and filters
+ok 4 - lib/filter.js facets, search and filters
+  ---
+  duration_ms: 1.263784
+  type: 'test'
+  ...
+# Subtest: lib/filter.js sorts deterministically and counts severities
+ok 5 - lib/filter.js sorts deterministically and counts severities
+  ---
+  duration_ms: 0.445935
+  type: 'test'
+  ...
+# Subtest: lib/layout.js layers follow edges and are stable
+ok 6 - lib/layout.js layers follow edges and are stable
+  ---
+  duration_ms: 0.789591
+  type: 'test'
+  ...
+# Subtest: lib/layout.js breaks cycles instead of looping forever
+ok 7 - lib/layout.js breaks cycles instead of looping forever
+  ---
+  duration_ms: 0.218456
+  type: 'test'
+  ...
+# Subtest: lib/layout.js edge selection filters by kind and reports drops
+ok 8 - lib/layout.js edge selection filters by kind and reports drops
+  ---
+  duration_ms: 0.489521
+  type: 'test'
+  ...
+# Subtest: graph.js renders an SVG with one group per node and one path per edge
+ok 9 - graph.js renders an SVG with one group per node and one path per edge
+  ---
+  duration_ms: 2.013577
+  type: 'test'
+  ...
+# Subtest: graph.js states when a graph is empty or too large
+ok 10 - graph.js states when a graph is empty or too large
+  ---
+  duration_ms: 0.934599
+  type: 'test'
+  ...
+# Subtest: graph.js legend describes every drawn edge kind
+ok 11 - graph.js legend describes every drawn edge kind
+  ---
+  duration_ms: 0.293472
+  type: 'test'
+  ...
+# Subtest: renderGraph handles missing node positions without throwing
+ok 12 - renderGraph handles missing node positions without throwing
+  ---
+  duration_ms: 0.189981
+  type: 'test'
+  ...
+# Subtest: the page boots, reports the engine version and the grammar facts
+ok 13 - the page boots, reports the engine version and the grammar facts
+  ---
+  duration_ms: 955.942227
+  type: 'test'
+  ...
+# Subtest: every navigation destination renders content (no empty pages)
+ok 14 - every navigation destination renders content (no empty pages)
+  ---
+  duration_ms: 285.054492
+  type: 'test'
+  ...
+# Subtest: the navigation is complete: every route has a link and every link a route
+ok 15 - the navigation is complete: every route has a link and every link a route
+  ---
+  duration_ms: 1.189787
+  type: 'test'
+  ...
+# Subtest: running an analysis uses the real engine and reports findings
+ok 16 - running an analysis uses the real engine and reports findings
+  ---
+  duration_ms: 59.343241
+  type: 'test'
+  ...
+# Subtest: the findings view lists findings and opens the evidence for one
+ok 17 - the findings view lists findings and opens the evidence for one
+  ---
+  duration_ms: 60.29512
+  type: 'test'
+  ...
+# Subtest: filtering the findings does not recompute anything and can empty the list
+ok 18 - filtering the findings does not recompute anything and can empty the list
+  ---
+  duration_ms: 37.333299
+  type: 'test'
+  ...
+# Subtest: the program graph view draws the dependency graph from the engine
+ok 19 - the program graph view draws the dependency graph from the engine
+  ---
+  duration_ms: 62.624716
+  type: 'test'
+  ...
+# Subtest: the data-flow view shows both equations and the block states
+ok 20 - the data-flow view shows both equations and the block states
+  ---
+  duration_ms: 60.690097
+  type: 'test'
+  ...
+# Subtest: the slicing view defaults to the sink of the first finding and lists the slice
+ok 21 - the slicing view defaults to the sink of the first finding and lists the slice
+  ---
+  duration_ms: 61.237657
+  type: 'test'
+  ...
+# Subtest: the rule editor validates a rule file with the engine and rejects a broken one
+ok 22 - the rule editor validates a rule file with the engine and rejects a broken one
+  ---
+  duration_ms: 114.434586
+  type: 'test'
+  ...
+# Subtest: the reports view offers both exports and compares two runs by identity
+ok 23 - the reports view offers both exports and compares two runs by identity
+  ---
+  duration_ms: 62.504858
+  type: 'test'
+  ...
+# Subtest: the status filter separates fixed from open findings after a comparison
+ok 24 - the status filter separates fixed from open findings after a comparison
+  ---
+  duration_ms: 38.111863
+  type: 'test'
+  ...
+# Subtest: the status filter explains itself before any comparison was made
+ok 25 - the status filter explains itself before any comparison was made
+  ---
+  duration_ms: 33.744283
+  type: 'test'
+  ...
+# Subtest: the documentation view documents the language, diagnostics and limits
+ok 26 - the documentation view documents the language, diagnostics and limits
+  ---
+  duration_ms: 33.914034
+  type: 'test'
+  ...
+# Subtest: no view renders a placeholder leak
+ok 27 - no view renders a placeholder leak
+  ---
+  duration_ms: 299.79143
+  type: 'test'
+  ...
+# Subtest: a partial analysis says so in the interface instead of looking clean
+ok 28 - a partial analysis says so in the interface instead of looking clean
+  ---
+  duration_ms: 91.449759
+  type: 'test'
+  ...
+# Subtest: an analysis uses the rules written in the Analyze page box, not another page's
+ok 29 - an analysis uses the rules written in the Analyze page box, not another page's
+  ---
+  duration_ms: 150.203261
+  type: 'test'
+  ...
+# Subtest: a run whose only sink call was cleared by a validator says so, and names it
+ok 30 - a run whose only sink call was cleared by a validator says so, and names it
+  ---
+  duration_ms: 91.058132
+  type: 'test'
+  ...
+1..30
+# tests 30
+# suites 0
+# pass 30
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5639.785473

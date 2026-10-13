@@ -1,0 +1,11 @@
+// expect: 1 finding, rule command_execution, interprocedural true
+string identity(string value) {
+  return value;
+}
+
+int main() {
+  string name = input();
+  string command = identity(name);
+  system(command);
+  return 0;
+}

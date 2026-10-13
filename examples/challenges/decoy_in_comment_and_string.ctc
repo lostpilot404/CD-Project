@@ -1,0 +1,9 @@
+// expect: 1 finding only: the two decoys below are text, not calls
+// A comment mentioning system(command); is not code.
+int main() {
+  string command = input();
+  string note = "remember: system(command) runs the value";  // a literal, not a call
+  /* A block comment naming audit_write(command); must not be reported either. */
+  system(command);
+  return 0;
+}

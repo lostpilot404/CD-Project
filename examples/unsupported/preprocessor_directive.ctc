@@ -1,0 +1,7 @@
+// expect: LEX101 preprocessor diagnostic; the directive is reported, not ignored
+#include "config.h"
+
+int main() {
+  system("ls");
+  return 0;
+}
