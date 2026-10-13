@@ -52,20 +52,29 @@ itself. `python3 -m codetrace.api` is the whole deployment.
 | `codetrace/reporting` | 3 | 650 | JSON report, self-contained HTML report |
 | `codetrace/api` | 4 | 1079 | HTTP server, routing, request validation, limits, schemas catalogue, `python3 -m` entry point |
 | `codetrace/*.py` | 2 | 22 | version constants and the package docstring |
-| `tests/` | 14 | 4856 | lexer, parser, semantics, CFG, data flow, taint, slicing, rules, API, reporting, end-to-end workflow |
+| `tests/` | 15 | 4964 | lexer, parser, semantics, CFG, data flow, taint, slicing, rules, API, reporting, end-to-end workflow, audit and mutation-check self-tests |
 | `frontend/` | 20 | 2833 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
 | `frontend/tests/` | 4 | 1365 | stub DOM, harness, library tests, view tests against a real engine |
 | `evaluation/` | 2 | 754 | labelled corpus harness and `expectations.json` |
-| `scripts/` | 5 | 1325 | dev server, full test run, corpus evaluation, independent audit, mutation check |
-| `docs/` | 12 | 3712 | the documentation set (see `README.md`) |
+| `scripts/` | 5 | 1401 | dev server, full test run, corpus evaluation, independent audit, mutation check |
+| `docs/` | 12 | 3730 | the documentation set (see `README.md`) |
 | `examples/` | 34 | 307 | 33 labelled `.ctc` sources and one example rule file |
 
 Total implementation: 12 612 lines of Python in `codetrace/` (39 files), 4 856
 lines of engine tests, 4 198 lines of frontend assets (of which 1 365 are the
 interface tests), 1 325 lines of scripts and 3712 lines of documentation.
-Counted with `wc -l`-style line counts, which include blank lines and comments;
-re-measure with `python3 scripts/audit.py -v`, which re-derives the module table
-from the tree instead of trusting this paragraph.
+Counted with `wc -l`-style line counts, which include blank lines and comments.
+The table is **checked**: `python3 scripts/audit.py` re-derives every row from
+the tree and fails if a number here disagrees, so a stale row cannot survive a
+green audit. When the audit reports drift, the same tool fixes it:
+
+```bash
+python3 scripts/audit.py -v                    # shows which rows drifted
+python3 scripts/audit.py --write-module-table  # re-measures and rewrites them
+```
+
+Editing a file in `scripts/` or `docs/` therefore changes the numbers on the
+next line of this paragraph; that is the check working, not a problem to ignore.
 
 ## 4. Module boundaries
 

@@ -39,6 +39,7 @@ scripts/tests.sh engine          # Python suites only (no Node needed)
 scripts/evaluate.sh              # the labelled corpus, JSON evidence in var/
 python3 scripts/audit.py         # independent Definition-of-Done audit (69 checks)
 python3 scripts/audit.py -v      # ... printing the value behind every check
+python3 scripts/audit.py --write-module-table   # refresh the measured module table
 python3 scripts/mutation_check.py  # break the engine on purpose: does the suite notice?
 python3 scripts/mutation_check.py --list   # the mutation catalogue, no changes made
 ```
@@ -107,7 +108,7 @@ language), so the interface cannot claim more than the engine implements.
 
 | Suite | Command | Result on this checkout |
 | --- | --- | --- |
-| Engine, API, reporting, workflow | `python3 -m unittest discover -s tests -t .` | 282 tests, all passing |
+| Engine, API, reporting, workflow | `python3 -m unittest discover -s tests -t .` | 286 tests, all passing |
 | Interface | `cd frontend && npm test` | 30 tests, all passing (real engine over HTTP, stub DOM) |
 | Labelled corpus | `scripts/evaluate.sh` | 33 files, 20 expected findings, TP 20 / FP 0 / FN 0, file-level TN 9/9, precision = recall = F1 = 1.0, ≈1.2 s total |
 | Independent audit | `python3 scripts/audit.py` | 69 checks covering grammar, hand-computed data flow, graph edges, slices, rules, the HTTP workflow, malformed input, the interface contract, document accuracy, the claims the documents make about the code, and drift between the module table and the tree |

@@ -122,7 +122,7 @@ explicit account of it:
 
 | Suite | Command | Result |
 | --- | --- | --- |
-| Engine, API, reporting, workflow | `python3 -m unittest discover -s tests -t .` | **282 tests, all passing** (test_api 37, test_cfg 15, test_dataflow 26, test_lexer 19, test_mutation_check 7, test_parser 27, test_reporting 24, test_rules 29, test_semantics 18, test_slicing 20, test_taint 40, test_workflow 20) |
+| Engine, API, reporting, workflow | `python3 -m unittest discover -s tests -t .` | **286 tests, all passing** (test_api 37, test_audit 4, test_cfg 15, test_dataflow 26, test_lexer 19, test_mutation_check 7, test_parser 27, test_reporting 24, test_rules 29, test_semantics 18, test_slicing 20, test_taint 40, test_workflow 20) |
 | Interface | `cd frontend && npm test` | **30 tests, all passing** |
 | Labelled corpus | `scripts/evaluate.sh` | **33 cases, 33 passed**: TP 20 / FP 0 / FN 0, file-level TN 9/9, precision = recall = F1 = 1.0, 1.14 s total |
 | Independent audit | `python3 scripts/audit.py` | **69 checks, all passing** |
@@ -198,11 +198,19 @@ Stated plainly, because a report that lists only successes is not a report:
   this project; precision/recall say nothing about detection quality on arbitrary
   C. There is no comparison against another tool.
 * **No context-sensitive interprocedural analysis.** A parameter tainted at one
-  call site is tainted for every call site of that function. This produces a
-  *documented* false positive:
-  `int run(string c) { return system(c); } int main() { string dirty = input();
-  string safe = "ls"; run(dirty); run(safe); }` reports both calls. It is
-  reproducible by hand and disclosed in the report limitations; no corpus case
+  call site is summarised as tainted for the whole function, so the tool cannot
+  say *which* call site is responsible and it cannot use the caller's argument at
+  the callee's branch. Measured, on three shapes:
+
+  | Program | Result |
+  | --- | --- |
+  | `run(c)` called only with `"ls /tmp"` | 0 findings — the summary is not tainted by a call site that passes a constant |
+  | `run(d)` with `d = input()` **and** `run(s)` with `s = "ls"` | 1 finding, at the sink inside `run`, certainty `approximate` — correct, but it does not name the call site that made the parameter tainted |
+  | `run(d, 0)` (which disables the sink branch) plus `run(s, 1)` | 1 finding with `feasibility: guarded` and certainty `approximate` — a potential flow, disclosed as branch-dependent rather than claimed as reachable |
+
+  The consequence is imprecision that the finding's own fields disclose, not an
+  unqualified claim: nothing in these shapes is reported as `confirmed`. It is
+  reproducible by hand and stated in `docs/LIMITATIONS.md` §1.3; no corpus case
   scores it, so the corpus numbers do not include it.
 * **No pointer, aliasing, struct, union, `switch`, `goto` or preprocessor
   support.** Constructs outside the subset are rejected with diagnostics; they
@@ -229,7 +237,7 @@ Stated plainly, because a report that lists only successes is not a report:
 ## 11. How to reproduce every claim above
 
 ```bash
-python3 -m unittest discover -s tests -t .   # 282 tests
+python3 -m unittest discover -s tests -t .   # 286 tests
 scripts/tests.sh                             # the above plus 30 interface tests
 scripts/evaluate.sh                          # 33 cases, JSON evidence in var/
 python3 scripts/audit.py -v                  # 69 independent checks, values printed

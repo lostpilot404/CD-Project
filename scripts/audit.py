@@ -59,6 +59,15 @@ VERBOSE = False
 FAILURES: list = []
 CHECKS = 0
 
+#: Filled in by ``check_claims`` so ``--write-module-table`` refreshes the table
+#: from the same measurement the check uses, rather than from a second
+#: implementation that could disagree with it.
+_MEASURED_MODULES: dict = {}
+
+#: Suppresses per-check output while a measuring helper runs (the table writer
+#: calls ``check_claims`` for its numbers and prints its own summary).
+SILENT = False
+
 
 def check(name: str, condition: bool, observed: object = "") -> None:
     """Record one check; never raises, so the audit reports every failure."""
@@ -68,10 +77,13 @@ def check(name: str, condition: bool, observed: object = "") -> None:
     if not condition:
         FAILURES.append(name)
     detail = f"  -> {observed}" if VERBOSE and observed != "" else ""
-    print(f"[{status}] {name}{detail}")
+    if not SILENT:
+        print(f"[{status}] {name}{detail}")
 
 
 def section(title: str) -> None:
+    if SILENT:
+        return
     print()
     print(f"--- {title} " + "-" * max(0, 62 - len(title)))
 
@@ -688,7 +700,9 @@ def check_claims() -> None:
     # every edit to the tree changes it.  Re-derive it here rather than trusting
     # the numbers in the prose.
     module_rows = {}
-    for line in open(os.path.join(ROOT, "docs", "TECHNICAL_DESIGN.md"), encoding="utf-8"):
+    with open(os.path.join(ROOT, "docs", "TECHNICAL_DESIGN.md"), encoding="utf-8") as handle:
+        table_text = handle.read()
+    for line in table_text.splitlines():
         match = re.match(r"\| `([^`]+)` \| (\d+) \| (\d+) \|", line)
         if match:
             module_rows[match.group(1)] = (int(match.group(2)), int(match.group(3)))
@@ -713,8 +727,10 @@ def check_claims() -> None:
     def measure_root_py() -> tuple:
         names = [n for n in sorted(os.listdir(os.path.join(ROOT, "codetrace")))
                  if n.endswith(".py")]
-        total = sum(len(open(os.path.join(ROOT, "codetrace", n), encoding="utf-8").read().splitlines())
-                    for n in names)
+        total = 0
+        for name in names:
+            with open(os.path.join(ROOT, "codetrace", name), encoding="utf-8") as handle:
+                total += len(handle.read().splitlines())
         return (len(names), total)
 
     measured = {
@@ -738,6 +754,8 @@ def check_claims() -> None:
     app_files, app_lines = measure("frontend")
     test_files, test_lines = measure("frontend/tests")
     measured["frontend/"] = (app_files - test_files, app_lines - test_lines)
+    _MEASURED_MODULES.clear()
+    _MEASURED_MODULES.update(measured)
 
     drift = []
     for name, expected in measured.items():
@@ -815,12 +833,70 @@ def check_claims() -> None:
     )
 
 
+MODULE_TABLE_PATH = os.path.join("docs", "TECHNICAL_DESIGN.md")
+
+
+def write_module_table() -> int:
+    """Rewrite the module table from the measured tree.
+
+    The table is checked exactly, because a stale row is a false statement about
+    the repository.  Keeping it exact has to be cheap, or it becomes a chore that
+    gets deferred: this flag re-measures every row and writes it back, so the
+    command that reports the drift is also the command that fixes it.
+
+        python3 scripts/audit.py --write-module-table
+    """
+    global SILENT
+    SILENT = True
+    before = len(FAILURES)
+    try:
+        check_claims()  # measures the tree and records it
+    finally:
+        SILENT = False
+    del FAILURES[before:]  # the measuring pass must not leave failures behind
+    measured = dict(_MEASURED_MODULES)
+    path = os.path.join(ROOT, MODULE_TABLE_PATH)
+    with open(path, encoding="utf-8") as handle:
+        lines = handle.readlines()
+
+    changed = []
+    for index, line in enumerate(lines):
+        match = re.match(r"\| `([^`]+)` \| (\d+) \| (\d+) \|(.*)$", line)
+        if not match:
+            continue
+        name = match.group(1)
+        if name not in measured:
+            continue
+        files, count = measured.pop(name)
+        replacement = f"| `{name}` | {files} | {count} |{match.group(4)}\n"
+        if replacement != line:
+            changed.append(f"{name}: {match.group(2)}/{match.group(3)} -> {files}/{count}")
+        lines[index] = replacement
+    if measured:
+        print("no row in the table for: " + ", ".join(sorted(measured)))
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.writelines(lines)
+    if changed:
+        print("module table updated:")
+        for entry in changed:
+            print(f"  {entry}")
+    else:
+        print("module table already matches the tree")
+    return 0
+
+
 def main() -> int:
     global VERBOSE
     parser = argparse.ArgumentParser(description="independent audit of this checkout")
     parser.add_argument("-v", "--verbose", action="store_true", help="print observed values")
+    parser.add_argument(
+        "--write-module-table", action="store_true",
+        help="re-measure the module table in docs/TECHNICAL_DESIGN.md and write it back",
+    )
     args = parser.parse_args()
     VERBOSE = args.verbose
+    if args.write_module_table:
+        return write_module_table()
 
     print(f"CodeTrace audit — {ROOT}")
     check_grammar()
