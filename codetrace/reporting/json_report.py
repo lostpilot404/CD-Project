@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from ..version import LANGUAGE_MODE
+from ..analysis.accesses import statement_accesses
 from ..analysis.pipeline import ENGINE_VERSION, Program
 
 from ..version import SCHEMA_VERSION  # noqa: F401  (re-exported)
@@ -44,6 +45,9 @@ STANDING_LIMITATIONS: List[str] = [
     "the whole array.",
     "Sanitizers are only trusted where a rule declares them, and only for the declared context; "
     "unknown functions are never assumed to validate their arguments.",
+    "A branch guarded by a rule-declared validator suppresses the flows through that branch: the "
+    "validator's implementation is not analysed, so the run assumes it rejects every value that "
+    "is unsafe for its context. Every such suppression is listed in guard_suppressions.",
     "Reports contain the results of the run they were produced from; re-running after editing the "
     "source or the rules produces a new, independent report.",
 ]
@@ -153,8 +157,50 @@ def build_report(
             "available": False,
             "note": "no labelled expectation was supplied for this run",
         },
-        "limitations": list(STANDING_LIMITATIONS) + list(program.limits_hit) + list(program.partial_reasons),
+        "notes": list(program.taint.notes),
+        "limitations": list(STANDING_LIMITATIONS)
+        + _suppression_limitations(program)
+        + list(program.limits_hit)
+        + list(program.partial_reasons),
     }
+
+
+def _suppression_limitations(program: Program) -> List[str]:
+    """Run-level limitation for the validator guards that hid a sink call.
+
+    Only suppressions that actually explain an unreported sink call are counted
+    here.  A cleared atom on an edge that leads to no sink at all is recorded in
+    ``guard_suppressions`` but is not a hidden finding, and saying otherwise would
+    overstate what the run concealed.
+    """
+    matched = _matched_suppressions(program)
+    if not matched:
+        return []
+    validators = sorted({entry["validator"] for entry in matched})
+    return [
+        f"{len(matched)} unreported sink call(s) were cleared by a rule-declared validator guard "
+        f"({', '.join(validators)}). The validator's implementation is not part of this run: the "
+        "result assumes it rejects every value that is unsafe for its context, and the sink call "
+        "is listed in dispositions.validator_guards (see guard_suppressions)."
+    ]
+
+
+def _matched_suppressions(program: Program) -> List[dict]:
+    """Suppressions that explain why a sink call in this run was not reported."""
+    matched: List[dict] = []
+    seen: set = set()
+    for call in program.semantic.calls:
+        if not program.rules.sink_rules(call.name):
+            continue
+        entry = _suppression_for_call(program, call)
+        if entry is None:
+            continue
+        key = (entry["function"], entry["symbol_id"], entry["validator"], entry["line"])
+        if key in seen:
+            continue
+        seen.add(key)
+        matched.append(entry)
+    return matched
 
 
 def _source_hash(source: str) -> str:
@@ -193,7 +239,17 @@ def dispositions(program: Program) -> dict:
         if any(call.line == finding.sink.get("line") for finding in program.findings):
             continue
         block = program.block_of_statement(call.sid, call.function)
-        if block is not None and (call.function, block) in pruned:
+        suppression = _suppression_for_call(program, call)
+        if suppression is not None:
+            reason = (
+                f"taint did reach this sink's data, but the flow was cleared on the guarded edge "
+                f"of {suppression['statement_text'].splitlines()[0]!r} at line "
+                f"{suppression['line']} by the rule-declared validator "
+                f"'{suppression['validator']}' (context {suppression['context']!r}); the validator's "
+                f"implementation is not analysed, so the run assumes it rejects every value that "
+                f"is unsafe for that context"
+            )
+        elif block is not None and (call.function, block) in pruned:
             reason = (
                 "the statement sits in a branch whose condition is a literal constant, so the "
                 "branch cannot execute and the statement was not analysed as reachable"
@@ -222,6 +278,7 @@ def dispositions(program: Program) -> dict:
     return {
         "sink_calls_seen": len(sink_calls),
         "reported": len(program.findings),
+        "validator_guards": _suppression_report_json(program),
         "unreported_sink_calls": unreported[:50],
         "unreported_count": len(unreported),
         "statically_pruned_branches": list(program.taint.infeasible_edges),
@@ -231,6 +288,58 @@ def dispositions(program: Program) -> dict:
             "statement sits in a branch whose literal condition makes it unreachable."
         ),
     }
+
+
+def _suppression_for_call(program: Program, call) -> Optional[dict]:
+    """The validator suppression that explains why ``call`` was not reported.
+
+    The match is on symbol identity, not on text: the suppression names a symbol
+    id, and the sink statement's own reads are looked up from the access
+    analysis, so an unrelated variable with the same spelling cannot be blamed.
+    """
+    suppressions = getattr(program.taint, "guard_suppressions", None) or []
+    if not suppressions:
+        return None
+    by_function: Dict[str, Dict[int, dict]] = {}
+    for entry in suppressions:
+        by_function.setdefault(entry["function"], {})[entry["symbol_id"]] = entry
+    candidates = by_function.get(call.function)
+    if not candidates:
+        return None
+    statement = program.statements.get(call.sid)
+    if statement is None:
+        return None
+    reads, _writes = statement_accesses(statement)
+    for symbol_id in sorted(reads):
+        if symbol_id in candidates:
+            return candidates[symbol_id]
+    return None
+
+
+def _suppression_report_json(program: Program) -> List[dict]:
+    """The suppressions in the shape the report documents."""
+    out = []
+    for entry in getattr(program.taint, "guard_suppressions", None) or []:
+        out.append(
+            {
+                "function": entry["function"],
+                "symbol": entry["symbol"],
+                "symbol_id": entry["symbol_id"],
+                "context": entry["context"],
+                "validator": entry["validator"],
+                "validator_function": entry["validator_function"],
+                "line": entry["line"],
+                "col": entry["col"],
+                "statement_text": entry["statement_text"],
+                "condition": entry["condition"],
+                "guard_edge": entry["guard_edge"],
+                "from_block": entry["from_block"],
+                "to_block": entry["to_block"],
+                "removed_atoms": list(entry["removed_atoms"]),
+                "assumption": entry["assumption"],
+            }
+        )
+    return out
 
 
 def to_json_text(report: dict) -> str:

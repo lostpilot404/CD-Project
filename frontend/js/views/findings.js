@@ -207,7 +207,7 @@ export async function renderFindings(container, { state, onFilter, onSort, onSel
       class: 'alert alert--info',
       text: run.summary.analysis_complete === false
         ? 'No findings, but the analysis was partial: see the diagnostics on the Analyze Code page before drawing conclusions.'
-        : 'No findings for this file. That means no configured source-to-sink flow was detected — not that the program is safe.',
+        : 'No findings for this file. That means no configured source-to-sink flow was detected — not that the program is safe. The Analyze Code page lists every sink call that was inspected and not reported, with the reason for each.',
     }));
   } else if (!filtered.length) {
     render(listNode, el('p', { class: 'empty-state', text: 'No finding matches the current filters.' }));

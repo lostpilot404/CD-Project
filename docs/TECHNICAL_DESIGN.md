@@ -96,7 +96,9 @@ Program
 │                        .reaching/.reaching_result/.reaching_states
 │                        .live/.live_result/.live_states
 │                        .definite/.definite_result/.definite_states
-├── taint            : atoms, hits, interprocedural summaries, converged flag
+├── taint            : atoms, hits, interprocedural summaries, converged flag,
+│                        guard_suppressions (validator guards that cleared atoms),
+│                        notes (per-run disclosures)
 ├── dependencies     : DependencyGraph (nodes, typed edges, stats)
 ├── slicing          : SliceEngine (backward/forward/for_finding)
 ├── findings         : ordered findings with evidence and explanations
@@ -116,6 +118,24 @@ set: symbol ids in declaration order, statement ids in source order, definition
 ids in access order, block ids in construction order. The API and the reports
 address results by those ids, and findings hash their identity from the flow
 itself (`docs/COMPILER_THEORY.md` §19).
+
+### 5.1 Reporting what was *not* reported
+
+Three of the stages above keep information that never becomes a finding, and the
+interface and the reports would be misleading without it. Rather than let a
+finding list stand for the whole result, the engine carries it explicitly:
+
+| Situation | Where it lives | How it reaches the user |
+| --- | --- | --- |
+| a validator guard cleared a flow that would otherwise be reported | `taint.guard_suppressions` (per guard: symbol id, context, validator rule, position, guarded edge, removed atoms) | `summary.dispositions.validator_guards`, the run's `notes`, a run-level string in `limitations`, the Analyze Code page panel "What the engine saw but did not report", and the HTML report's section of the same name |
+| a sink call was inspected and produced no finding | `reporting/json_report.py::dispositions` — reason per sink call, distinguished into *no taint reached it*, *statically pruned branch*, or *cleared by validator X* | `summary.dispositions.unreported_sink_calls` and the same panel/section |
+| a stage was cut short by a limit or an unsupported construct | `limits_hit`, `partial_reasons`, `unsupported` | `summary.analysis_complete` / `partial_reasons`, the Analyze page warning, and the report's limitations |
+
+The disposition reason is decided by symbol identity: a suppressed guard is
+matched against the sink call's own reads (`analysis.accesses.statement_accesses`
+over `guard_suppressions.symbol_id`), so a guard on an unrelated variable is
+never blamed for an unreported sink, and a run that *did* report a finding
+elsewhere does not claim that the guard hid anything.
 
 ## 6. Storage
 

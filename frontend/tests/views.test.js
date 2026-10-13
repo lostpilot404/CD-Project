@@ -470,3 +470,51 @@ test('an analysis uses the rules written in the Analyze page box, not another pa
     /now in the custom rules box/,
   );
 });
+
+test('a run whose only sink call was cleared by a validator says so, and names it', async () => {
+  // The result a user is most likely to misread is "0 findings". Here the taint
+  // does reach `system(name)`; what cleared it is the declared validator on the
+  // guarding branch. The Analyze page must therefore carry the engine's own
+  // account of the run rather than letting an empty finding list speak for it.
+  const { state } = await import('../js/state.js');
+  await go('analyze');
+  page.document.getElementById('source-input').value =
+    'int main() {\n  string name = input();\n  if (is_safe_command(name)) {\n'
+    + '    system(name);\n  }\n  return 0;\n}\n';
+  page.document.getElementById('filename-input').value = 'guarded-fixture.ctc';
+  page.document.getElementById('use-builtin').checked = true;
+  page.document.getElementById('analyze-button').click();
+  await waitFor(
+    () => {
+      const text = page.document.getElementById('analyze-status').textContent;
+      return text.includes('guarded-fixture.ctc') && text.includes('run ');
+    },
+    'the guarded analysis to finish',
+    30000,
+  );
+
+  assert.equal(state.run.findings.length, 0, 'the guarded flow is not reported as a finding');
+
+  const dispositions = state.run.summary.dispositions;
+  assert.ok(dispositions, 'the run payload carries the dispositions');
+  assert.equal(dispositions.sink_calls_seen, 1);
+  assert.equal(dispositions.unreported_count, 1);
+  assert.equal(dispositions.validator_guards.length, 1);
+  assert.equal(dispositions.validator_guards[0].validator, 'validate_command');
+  assert.match(dispositions.unreported_sink_calls[0].reason, /cleared/);
+  assert.ok(state.run.notes.length > 0, 'the run notes are carried to the page');
+
+  const panel = page.document.getElementById('analyze-dispositions').textContent;
+  assert.match(panel, /What the engine saw but did not report/);
+  assert.match(panel, /validate_command/, 'the validator that cleared the flow is named');
+  assert.match(panel, /assumption/, 'it is presented as an assumption');
+  assert.match(panel, /not analysed/, 'the report states the validator body is not analysed');
+  assert.match(panel, /inspected and not reported/, 'the inspected sink call is counted');
+  assert.match(panel, /Notes recorded for this run/);
+
+  // And the Findings page must not let the empty list stand alone.
+  await go('findings');
+  const findingsText = viewText('findings');
+  assert.match(findingsText, /not that the program is safe/);
+  assert.match(findingsText, /inspected and not reported/);
+});

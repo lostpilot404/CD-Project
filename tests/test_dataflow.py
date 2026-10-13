@@ -452,6 +452,180 @@ int main() {
             self.assertEqual(problem.transfer(block_id, left), left | problem.defs.get(block_id, 0))
 
 
+class MustAnalysisInitialisationTests(unittest.TestCase):
+    """The solver contract for a meet-by-intersection ("must") analysis.
+
+    A must-analysis iterates *downwards* from the lattice top.  If it starts at
+    the lattice bottom instead, a block whose predecessors are computed late
+    loses facts that are true on every path, and the loss depends on the order in
+    which the worklist happened to visit the cycle.  These tests pin both halves
+    of that contract: the concrete definite-assignment analysis, and the generic
+    solver that must honour a problem's ``initial_value``.
+    """
+
+    # The inner loop header has three predecessors, two of which are back edges
+    # into the same cycle: the worst case for a badly initialised must-analysis.
+    NESTED_LOOPS = """
+int main() {
+  int total = 0;
+  int i = 0;
+  while (i < 3) {
+    int j = 0;
+    while (j < 4) {
+      if (j == 1) { j = j + 1; continue; }
+      if (j == 3) { break; }
+      total = total + 1;
+      j = j + 1;
+    }
+    i = i + 1;
+  }
+  return total;
+}
+"""
+
+    def test_facts_assigned_before_a_nested_loop_survive_both_back_edges(self):
+        # By hand: every path reaching the inner header passes the two
+        # initialisations in the entry block, and neither inner loop assigns
+        # ``total`` or ``i`` before reading them again, so the inner header's IN
+        # is {total, i, j} and no read can be "possibly uninitialised".
+        analysis = analyse(self.NESTED_LOOPS).analyses["main"]
+        self.assertEqual(analysis.definite.uninitialised_reads(analysis.definite_result), [])
+        headers = [entry["header"] for entry in analysis.cfg.to_json()["loops"]]
+        self.assertEqual(len(headers), 2)
+        for header in headers:
+            assigned = analysis.definite.definitely_assigned(analysis.definite_result, header)
+            self.assertIn("total", strip(assigned))
+        # The inner header (the larger id here) also sees ``j``, which the outer
+        # body initialises before the inner loop is entered.
+        inner = max(headers)
+        self.assertEqual(
+            strip(analysis.definite.definitely_assigned(analysis.definite_result, inner)),
+            ["i", "j", "total"],
+        )
+        outer = min(headers)
+        self.assertEqual(
+            strip(analysis.definite.definitely_assigned(analysis.definite_result, outer)),
+            ["i", "total"],
+        )
+
+    def test_a_variable_only_assigned_inside_a_loop_is_still_reported_after_it(self):
+        # A must-analysis must not become optimistic: the loop may execute zero
+        # times, so ``n`` has no value at the return.
+        analysis = analyse(
+            """
+int main() {
+  int n;
+  while (input_int() > 0) { n = 1; }
+  return n;
+}
+"""
+        ).analyses["main"]
+        reports = analysis.definite.uninitialised_reads(analysis.definite_result)
+        self.assertEqual(
+            [(report["symbol"], report["line"]) for report in reports],
+            [("n", 4)],
+            [(r["symbol"], r["sid"], r["line"]) for r in reports],
+        )
+
+    def test_a_loop_condition_read_before_the_body_assigns_is_reported(self):
+        analysis = analyse(
+            """
+int main() {
+  int n;
+  while (n > 0) { n = 1; }
+  return 0;
+}
+"""
+        ).analyses["main"]
+        reports = analysis.definite.uninitialised_reads(analysis.definite_result)
+        self.assertEqual([report["symbol"] for report in reports], ["n"])
+
+    def test_the_entry_block_starts_from_its_boundary_not_from_the_top(self):
+        # A read of a parameter is fine; a read of a variable declared and not
+        # initialised in the entry block is not.  Starting the entry block at the
+        # lattice top would hide the second case.
+        analysis = analyse(
+            """
+int main(int argc) {
+  int unused;
+  return argc + unused;
+}
+"""
+        ).analyses["main"]
+        reports = analysis.definite.uninitialised_reads(analysis.definite_result)
+        self.assertEqual([report["symbol"] for report in reports], ["unused"])
+
+    def test_the_solver_honours_a_problem_that_starts_at_the_top(self):
+        # A minimal must-analysis: ``x`` holds wherever every path from the entry
+        # establishes it, generated only in the entry block.  Over the nested
+        # loops, the fact has to survive two cycles whose back edges are partly
+        # computed, which is exactly what a bottom-initialised iteration loses.
+        cfg = analyse(self.NESTED_LOOPS).cfgs["main"]
+        domain = BitVectorDomain(atoms=["x"], name="must-x")
+
+        class MustReach(DataFlowProblem):
+            def __post_init__(self) -> None:
+                self.name = "must-x"
+                self.direction = "forward"
+                self.gen = {cfg.entry: domain.singleton("x")}
+
+            def boundary_value(self, block_id: int) -> int:
+                return domain.singleton("x") if block_id == cfg.entry else 0
+
+            def initial_value(self, block_id: int) -> int:
+                # The contract: every non-boundary block starts at the top.
+                return 0 if block_id == cfg.entry else domain.full()
+
+            def meet(self, values):
+                result = values[0]
+                for value in values[1:]:
+                    result &= value
+                return result
+
+            def transfer(self, block_id: int, in_value: int) -> int:
+                return in_value | self.gen.get(block_id, 0)
+
+        result = solve(MustReach(cfg=cfg, domain=domain))
+        self.assertTrue(result.converged)
+        for block_id in cfg.reachable:
+            self.assertIn(
+                "x",
+                domain.atoms_of(result.in_values[block_id]),
+                f"block {block_id} lost the must-fact",
+            )
+
+    def test_the_solver_keeps_the_bottom_start_for_a_may_analysis(self):
+        # The default must stay the lattice bottom: a union-meet analysis that
+        # started at the top would claim every block reachable, which is exactly
+        # the mistake this contract exists to avoid.
+        cfg = analyse(self.NESTED_LOOPS).cfgs["main"]
+        domain = BitVectorDomain(atoms=["x"], name="may-x")
+
+        class MayReach(DataFlowProblem):
+            def __post_init__(self) -> None:
+                self.name = "may-x"
+                self.direction = "forward"
+                self.gen = {cfg.entry: domain.singleton("x")}
+
+            def boundary_value(self, block_id: int) -> int:
+                return domain.singleton("x") if block_id == cfg.entry else 0
+
+            def meet(self, values):
+                result = 0
+                for value in values:
+                    result |= value
+                return result
+
+            def transfer(self, block_id: int, in_value: int) -> int:
+                return in_value
+
+        problem = MayReach(cfg=cfg, domain=domain)
+        self.assertEqual(problem.initial_value(cfg.entry), 0, "default start is the bottom")
+        result = solve(problem)
+        for block_id in cfg.reachable:
+            self.assertIn("x", domain.atoms_of(result.in_values[block_id]))
+
+
 class SolverTests(unittest.TestCase):
     """The framework itself: worklist, limits, determinism, custom problems."""
 

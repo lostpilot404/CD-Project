@@ -271,6 +271,18 @@ Liveness (backward, union):
                            earlier in the same block
 ```
 
+The asymmetry is what makes this a *must* analysis rather than a *may* one: an
+intersection meet can only lose facts, so the iteration starts at "everything is
+assigned" and is refined downwards, while the entry keeps an empty fact because
+nothing is assigned before the program starts. Seeding the other blocks with ∅
+instead lets a loop header lose a fact that its back edge has not yet
+established, which turns into a `DFA001` false positive. Measured: with ∅
+seeding, the loop body `for (int i = 0; i < 3; i++) { if (i == 1) { continue; }
+n = n + i; }` over a variable assigned before the loop yields two `DFA001` false
+positives (at the read inside the loop and at `return n;`); with ⊤ seeding it
+yields none. `MustAnalysisInitialisationTests` pins the same contract on a
+nested loop whose inner header has two back edges.
+
 * **Complexity:** as §10; the intersection meet means values only shrink, which
   bounds the iterations the same way.
 * **Measured:** for `int a; int b = a + 1;` the read of `a` at `1:21` is reported
@@ -311,6 +323,15 @@ replay(main):
   with the call-site limitation attached.
 * **Measured:** taint is the second most expensive phase after parsing
   (≈ 0.4 ms for a 60-byte example, ≈ 32 ms per corpus file end to end).
+* **Recorded guard suppressions:** after the fixpoint, every edge that a
+  validator guard pruned is inspected (`_guard_suppression_report`). An edge
+  whose pruning actually removed atoms from the block's `IN` set is recorded in
+  `guard_suppressions` with the symbol, context, validator rule, source
+  position, edge role and the atoms it removed. Reporting matches each record
+  against the sink calls in its function *by symbol id* (`statement_accesses`),
+  so a guard on an unrelated variable is never blamed for an unreported sink.
+  The report's `summary.dispositions.validator_guards` and the run's
+  `limitations` entry are built from that match, not from the raw record count.
 
 ## 14. Dependency graph construction
 

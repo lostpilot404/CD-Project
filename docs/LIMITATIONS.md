@@ -59,6 +59,7 @@ Consequences worth stating plainly:
 | **Text-based finding identity** | run comparison | identity hashes the sink statement text, so renaming the sink's variable reports the finding as *new* + *resolved* rather than *moved* |
 | **Sanitizers only where declared** | `sanitizers_seen`, `RULE026` warning | a sanitiser that is not declared in a rule is treated as an unknown function, so taint continues through it; a declared sanitiser is trusted for exactly one context (or all contexts with `*`) and only for the argument it declares |
 | **Modelled externals only** | `unknown-call` path steps | an unmodelled function's result is assumed to depend on its arguments (never assumed safe), and the finding records that assumption |
+| **Validator bodies are not analysed** | `validator_guards`, `guard_suppressions`, run `notes` | a rule-declared validator guarding a branch clears the taint that crosses that branch, and the analysis assumes it rejects every value unsafe for its declared context. The assumption is recorded per guard (symbol, context, line, removed atoms) and repeated in the run's `limitations`, so a suppressed flow is never presented as a flow that never existed |
 
 ### 1.4 Bounded work, disclosed when it bites
 

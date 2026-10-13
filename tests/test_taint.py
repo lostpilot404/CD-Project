@@ -233,6 +233,94 @@ int main() {
         # unvalidated value; the edge refinement removes the atom on that edge.
         self.assertEqual(program.findings, [])
 
+    def test_a_validator_suppression_is_recorded_as_an_assumption(self):
+        # The engine does not analyse the validator's implementation, so a flow
+        # that the guard cleared must be recorded, not silently dropped: "nothing
+        # was reported" and "a declared validator was assumed to reject it" are
+        # different statements, and only one of them is true here.
+        program = analyse(
+            """
+int main() {
+  string cmd = input();
+  if (is_safe_command(cmd)) {
+    system(cmd);
+  }
+  return 0;
+}
+"""
+        )
+        self.assertEqual(program.findings, [])
+        suppressions = program.taint.guard_suppressions
+        self.assertEqual(len(suppressions), 1)
+        entry = suppressions[0]
+        self.assertEqual(
+            (entry["function"], entry["symbol"], entry["context"]),
+            ("main", "cmd", "command"),
+        )
+        self.assertEqual(entry["validator"], "validate_command")
+        self.assertEqual(entry["validator_function"], "is_safe_command")
+        self.assertEqual(entry["removed_atoms"], ["src:stdin@command"])
+        self.assertEqual(entry["guard_edge"], "true")
+        self.assertIn("assumes it rejects", entry["assumption"])
+        self.assertTrue(any("cleared on" in note for note in program.taint.notes))
+
+    def test_a_negated_guard_clears_only_the_edge_it_guards(self):
+        # ``if (!is_safe_command(x))`` guards the *false* edge, so a sink inside
+        # the true branch still receives the unvalidated value.
+        program = analyse(
+            """
+int main() {
+  string cmd = input();
+  if (!is_safe_command(cmd)) {
+    system(cmd);
+  }
+  return 0;
+}
+"""
+        )
+        self.assertEqual(finding_labels(program.findings), ["command_execution@4"])
+        self.assertEqual(len(program.taint.guard_suppressions), 1)
+        self.assertEqual(program.taint.guard_suppressions[0]["guard_edge"], "false")
+
+    def test_a_guard_on_another_symbol_cannot_clear_this_one(self):
+        # Symbol identity, not spelling: the guard covers ``checked`` and the
+        # sink consumes ``other``, so the flow stands.
+        program = analyse(
+            """
+int main() {
+  string checked = input();
+  string other = input();
+  if (is_safe_command(checked)) {
+    system(other);
+  }
+  return 0;
+}
+"""
+        )
+        self.assertEqual(finding_labels(program.findings), ["command_execution@5"])
+        self.assertEqual(
+            [entry["symbol"] for entry in program.taint.guard_suppressions], ["checked"]
+        )
+
+    def test_a_guard_on_a_compound_argument_is_not_applied_and_says_so(self):
+        program = analyse(
+            """
+int main() {
+  string cmd = input();
+  if (is_safe_command(cmd + "x")) {
+    system(cmd);
+  }
+  return 0;
+}
+"""
+        )
+        self.assertEqual(finding_labels(program.findings), ["command_execution@4"])
+        self.assertEqual(program.taint.guard_suppressions, [])
+        self.assertTrue(
+            any("not a plain variable" in note for note in program.taint.notes),
+            program.taint.notes,
+        )
+
     def test_no_branch_means_no_branch_conditions(self):
         program = analyse("int main() { string cmd = input(); system(cmd); return 0; }")
         finding = program.findings[0]

@@ -55,6 +55,13 @@ from .schemas import API_VERSION, ENDPOINTS, SCHEMAS
 # ----------------------------------------------------------------------
 MAX_BODY_BYTES = 1_100_000
 MAX_SOURCE_BYTES = 512 * 1024
+
+#: How much of an oversized request body the server reads before answering, so
+#: that the client can finish sending and then read the error response.  Bounded
+#: on purpose: the point is to deliver the 413 cleanly, not to accept a body the
+#: API refuses.
+DRAIN_BUDGET_BYTES = 8 * 1024 * 1024
+DRAIN_TIMEOUT_SECONDS = 5.0
 RUN_CACHE_SIZE = 24
 MAX_STATEMENT_INDEX = 2000
 EXAMPLES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
@@ -214,11 +221,44 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def _drain_request_body(self, remaining: int) -> None:
+        """Read and discard up to ``remaining`` bytes of an unwanted body.
+
+        Answering a request before reading its body would leave unread bytes in
+        the socket; closing the connection then resets it, and the client sees a
+        broken pipe instead of the error envelope the API documents.  Draining is
+        bounded by both a byte budget and a short socket timeout, so a client that
+        streams indefinitely cannot hold the worker for long: whatever is left
+        when the budget runs out is abandoned and the connection is closed.
+        """
+        budget = min(max(remaining, 0), DRAIN_BUDGET_BYTES)
+        if budget <= 0:
+            return
+        connection = self.connection
+        previous_timeout = connection.gettimeout()
+        connection.settimeout(DRAIN_TIMEOUT_SECONDS)
+        try:
+            while budget > 0:
+                chunk = connection.recv(min(budget, 65536))
+                if not chunk:
+                    break
+                budget -= len(chunk)
+        except OSError:
+            pass  # the client went away; nothing left to drain
+        finally:
+            try:
+                connection.settimeout(previous_timeout)
+            except OSError:
+                pass
+
     def _read_json(self) -> dict:
         length = int(self.headers.get("Content-Length") or 0)
         if length <= 0:
             return {}
         if length > MAX_BODY_BYTES:
+            # Answering with a 413 without consuming the body makes clients fail
+            # with a broken pipe instead of reading the documented error.
+            self._drain_request_body(length)
             raise ApiError(413, "payload-too-large",
                            f"request body exceeds the {MAX_BODY_BYTES} byte limit")
         raw = self.rfile.read(length)

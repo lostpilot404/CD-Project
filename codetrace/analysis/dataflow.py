@@ -109,7 +109,19 @@ class DataFlowProblem:
         return self.domain.empty()
 
     def initial_value(self, block_id: int) -> int:
-        """Starting value for every other block (usually the lattice bottom)."""
+        """Starting value of the iteration for a block that is not the boundary.
+
+        The lattice bottom is the right start for a *may* analysis (union meet):
+        the iteration only ever adds facts, so it climbs to the least fixpoint,
+        which is the meet-over-all-paths solution.
+
+        A *must* analysis (intersection meet) has to start at the lattice **top**
+        instead and be refined downwards, because its facts hold only if every
+        predecessor path establishes them; starting at the bottom there makes the
+        intersection of a partially computed block with a fully computed one lose
+        facts that are in fact true on every path.  Analyses that meet with
+        intersection therefore override this method.
+        """
         return self.domain.empty()
 
     def meet(self, values: List[int]) -> int:

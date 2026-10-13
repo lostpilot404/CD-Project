@@ -26,21 +26,39 @@ generated on demand and never stored on disk by the server.
 | `unknown_values` | array | values the analysis could not determine (kept empty rather than guessed) |
 | `analysis` | object | `order` (the pipeline stages that ran), `functions` (per-function CFG and fixpoint statistics), `taint` (engine version, iterations, convergence, per-function summaries, infeasible branches, notes), `dependency_graph` (node/edge counts and edge kinds) |
 | `metrics` | object | measured counts and per-phase timings (§3) |
-| `limitations` | array | strings that apply to the whole run |
+| `notes` | array | the run's own notes (engine version of each analysis stage, context-insensitivity, cleared guard atoms, iteration limits) |
+| `limitations` | array | strings that apply to the whole run, including any validator-guard suppression that hid a sink call |
 | `evaluation` | object | `{"available": false, "note": …}` unless a corpus label was supplied for this file, in which case the label is echoed here |
 
 The `summary.dispositions` block is the honesty mechanism for unreported sinks:
 
 ```json
 {"sink_calls_seen": 1, "reported": 1, "unreported_sink_calls": [],
- "unreported_count": 0, "statically_pruned_branches": [],
+ "unreported_count": 0, "statically_pruned_branches": [], "validator_guards": [],
  "note": "A sink call appears here when no enabled flow connects a configured source to it …"}
 ```
 
 Every sink call the analysis encountered is either reported or listed in
-`unreported_sink_calls` with its enclosing function, line and the reason
-("no taint of the required context reached this sink argument, or no enabled
-flow connects a known source to it").
+`unreported_sink_calls` with its enclosing function, line and the reason. Three
+reasons are distinguished, because they are not the same claim:
+
+| Reason | What it means |
+| --- | --- |
+| no taint of the required context reached this sink argument | the configured sources do not flow here under the active rules |
+| the statement sits in a branch whose condition is a literal constant | the branch cannot execute; the statement was not analysed as reachable |
+| taint did reach this sink's data, but the flow was cleared on the guarded edge … by the rule-declared validator `X` | the flow exists and would be reported, but a declared validator on the guarding branch is assumed to reject it |
+
+### 1.1 `summary.dispositions.validator_guards`
+
+The third reason above is an **assumption, not an absence**, so it is reported
+explicitly. Each entry names the guard: `function`, `symbol`, `symbol_id`,
+`context`, `validator` (the rule id), `validator_function` (the called
+function), `line`, `col`, `statement_text`, `condition`, `guard_edge`
+(`true`/`false`), `from_block`, `to_block`, `removed_atoms` and the `assumption`
+sentence. The same records appear in the run's `notes` (as cleared-atom counts)
+and in `limitations` (as "N unreported sink call(s) were cleared by a
+rule-declared validator guard"). The interface shows them on the Analyze Code
+page under "What the engine saw but did not report".
 
 ## 2. Findings
 

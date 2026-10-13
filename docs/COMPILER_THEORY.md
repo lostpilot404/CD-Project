@@ -664,10 +664,27 @@ The declaration `int a;` creates no definition (it is `DECL_UNINIT`), so the
 block's GEN set is `{b}` and the read of `a` in the same statement is flagged
 with its exact location.
 
+**The initial value is not a formality.** A *may* analysis starts at the
+interval/bitset bottom (∅) because the union meet can only grow; a *must*
+analysis must start at ⊤ everywhere except the entry, because the intersection
+meet can only shrink. Starting definite assignment at ∅ instead makes the result
+depend on the order in which blocks are first visited: a loop header whose back
+edge is processed before the fact has been established intersects with an empty
+set and loses it. On `int n = 0; for (int i = 0; i < 3; i++) { n = n + i; }
+return n;` the fact "`n` is assigned" survives the back edge only with ⊤
+initialisation; with ∅ the analysis reports `DFA001` for a variable that is
+assigned on every path — a false positive produced entirely by the choice of
+initial value. The engine implements the boundary as
+`initial_value(entry) = ∅`, `initial_value(other) = ⊤`
+(`definite_assignment.py`), and the hand-verified loop and nested-loop tests in
+`tests/test_dataflow.py::MustAnalysisInitialisationTests` fail if the override is
+removed.
+
 **Implementation / tests / limits.** `codetrace/analysis/definite_assignment.py`;
-`tests/test_dataflow.py::DefiniteAssignmentTests`, `/api/runs/{id}/dataflow?
-analysis=definite`, `scripts/audit.py`. Limit: no path-sensitivity inside
-expressions, no tracking of partially assigned arrays.
+`tests/test_dataflow.py::DefiniteAssignmentTests::`
+`::MustAnalysisInitialisationTests`, `/api/runs/{id}/dataflow?analysis=definite`,
+`scripts/audit.py`. Limit: no path-sensitivity inside expressions, no tracking of
+partially assigned arrays.
 
 ---
 

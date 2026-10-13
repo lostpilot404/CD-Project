@@ -406,6 +406,23 @@ class ValidationAndErrorTests(ApiTestCase):
         self.assertEqual(status, 413)
         self.assertIn("error", body)
 
+    def test_an_oversized_body_still_receives_the_error_envelope(self):
+        # A body far larger than any socket buffer: the client is still sending
+        # when the server decides to refuse.  Answering without consuming the
+        # body resets the connection and the client sees a broken pipe instead
+        # of the documented 413 envelope, so this test fails unless the server
+        # drains what the client has left to send.
+        body = json.dumps({
+            "source": "int main() { return 0; }",
+            "padding": "x" * (3 * 1024 * 1024),
+        }).encode()
+        status, headers, text = self.request("POST", "/api/analyze", raw=body)
+        self.assertEqual(status, 413, text[:200])
+        self.assertIn("application/json", headers.get("Content-Type", ""))
+        payload = json.loads(text)
+        self.assertEqual(payload["error"]["code"], "payload-too-large")
+        self.assertTrue(payload["error"]["message"])
+
     def test_malformed_json_body(self):
         status, headers, body = self.request("POST", "/api/analyze", raw=b"{not json")
         self.assertEqual(status, 400)

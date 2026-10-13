@@ -86,6 +86,25 @@ class DefiniteAssignment(DataFlowProblem):
     def boundary_value(self, block_id: int) -> int:
         return self.entry_bits
 
+    def initial_value(self, block_id: int) -> int:
+        """Start every block at the lattice top; the entry keeps its boundary.
+
+        Definite assignment must hold on *every* path, so the meet is
+        intersection and the iteration has to be refined downwards from "every
+        tracked variable is assigned".  Starting from the empty set (the lattice
+        bottom, correct for a union meet) makes a block's fact depend on the
+        order in which its predecessors were first visited: a loop header whose
+        back edge is computed before the fact has been established loses the
+        fact, and the analysis then reports "may be used before it is assigned"
+        for variables that are in fact assigned on every path.
+
+        The entry block is left at the bottom: the solver overwrites its IN value
+        with ``boundary_value`` before the first iteration.
+        """
+        if block_id == self.cfg.entry:
+            return self.domain.empty()
+        return self.domain.full()
+
     # -- queries ---------------------------------------------------------
     def uninitialised_reads(self, result: DataFlowResult) -> List[dict]:
         findings: List[dict] = []

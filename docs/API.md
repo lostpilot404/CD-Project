@@ -102,7 +102,9 @@ Response (`AnalysisResponse`):
              "unsupported_constructs": 0, "functions": ["build_command", "main"],
              "analysis_complete": true, "partial_reasons": [],
              "dispositions": {"sink_calls_seen": 1, "reported": 1,
-                              "unreported_sink_calls": []}},
+                              "unreported_sink_calls": [],
+                              "unreported_count": 0, "validator_guards": []}},
+ "notes": ["…per-run notes, including any atom cleared by a declared validator guard…"],
  "diagnostics": [{"code": "SEM018", "severity": "warning", "message": "…", "line": 1, "col": 34, "phase": "semantics"}],
  "findings": [{"id": "F…", "rule_id": "command_execution", "category": "command-injection",
                "severity": "HIGH", "certainty": "approximate", "source": {…}, "sink": {…},
@@ -203,6 +205,11 @@ derived from the flow, not from line numbers, so a formatting change reports
 | data-flow fixpoint | 10 000 iterations / 200 000 steps | `converged: false` and a partial-analysis note |
 | parse steps / syntax errors | internal caps | `SYN010` / `SYN011`, analysis marked partial |
 | stored runs | 24 (LRU) | the oldest run is dropped; the API answers `404 run-not-found` |
+
+An oversized body is rejected before it is parsed, and the bytes already sent are
+drained (up to 8 MiB / 5 s) before the connection closes, so the client reads the
+`413` error envelope instead of a reset connection. A client that keeps sending
+past the drain budget gets the envelope anyway; only the unsent remainder is lost.
 
 ## 8. Using the API without the browser
 

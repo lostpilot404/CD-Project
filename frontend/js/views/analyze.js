@@ -37,9 +37,78 @@ export function diagnosticTable(diagnostics) {
   ]);
 }
 
+/**
+ * "What the engine saw but did not report".
+ *
+ * A short findings list is the most easily misread result the tool produces, so
+ * the run's own account of it is shown next to the summary: the sink calls that
+ * were inspected and not reported (with the reason for each), the branch guards
+ * that cleared a flow, the branches pruned as unreachable and the run's notes
+ * (interprocedural approximation, iteration limits, unsupported constructs).
+ * Every value here comes from the engine payload; nothing is recomputed here.
+ */
+export function dispositionsPanel(run) {
+  const summary = run.summary || {};
+  const dispositions = summary.dispositions || null;
+  const notes = run.notes || [];
+  const guards = (dispositions && dispositions.validator_guards) || [];
+  const unreported = (dispositions && dispositions.unreported_sink_calls) || [];
+  const pruned = (dispositions && dispositions.statically_pruned_branches) || [];
+  if (!dispositions && !notes.length) return null;
+
+  const rows = [];
+  if (dispositions) {
+    rows.push(el('dt', { text: 'sink calls inspected' }), el('dd', { text: String(dispositions.sink_calls_seen ?? '—') }));
+    rows.push(el('dt', { text: 'reported as findings' }), el('dd', { text: String(dispositions.reported ?? '—') }));
+    rows.push(el('dt', { text: 'inspected but not reported' }), el('dd', { text: String(dispositions.unreported_count ?? unreported.length) }));
+    rows.push(el('dt', { text: 'branches pruned as unreachable' }), el('dd', { text: String(pruned.length) }));
+  }
+
+  const children = [
+    el('h2', { text: 'What the engine saw but did not report' }),
+    rows.length ? el('dl', { class: 'kv' }, rows) : null,
+  ];
+
+  if (guards.length) {
+    children.push(el('p', { class: 'alert alert--info', text:
+      'A rule-declared validator guards part of this program: the flows through that guard were '
+      + 'cleared, and the validator\u2019s implementation is not analysed. The result assumes it '
+      + 'rejects every value that is unsafe for its context.' }));
+    children.push(el('ul', {}, guards.map((guard) => el('li', {}, [
+      el('span', { class: 'badge badge--muted', text: 'assumption' }),
+      ' ',
+      el('span', { class: 'mono', text: `${guard.validator}()` }),
+      ` guards ${guard.symbol} for context “${guard.context}” at line ${guard.line}`
+        + ` (${guard.removed_atoms.join(', ')} removed)`,
+    ]))));
+  }
+
+  if (unreported.length) {
+    children.push(el('details', {}, [
+      el('summary', { text: `Sink calls that were inspected and not reported (${unreported.length})` }),
+      el('ul', {}, unreported.map((entry) => el('li', {}, [
+        el('span', { class: 'mono', text: `${entry.function}() line ${entry.line}` }),
+        ` — ${entry.sink_rule || 'sink'}: `,
+        el('span', { class: 'hint', text: entry.reason }),
+      ]))),
+    ]));
+  }
+
+  if (notes.length) {
+    children.push(el('h3', { text: 'Notes recorded for this run' }));
+    children.push(el('ul', {}, notes.map((note) => el('li', { class: 'hint', text: note }))));
+  }
+
+  if (dispositions && dispositions.note) {
+    children.push(el('p', { class: 'hint', text: dispositions.note }));
+  }
+  return children;
+}
+
 export function renderAnalyze(container, { state, onRun, onStatus }) {
   const status = container.querySelector('#analyze-status');
   const summary = container.querySelector('#analyze-summary');
+  const seen = container.querySelector('#analyze-dispositions');
   const diagnostics = container.querySelector('#analyze-diagnostics');
   const source = state.source || '';
 
@@ -52,6 +121,7 @@ export function renderAnalyze(container, { state, onRun, onStatus }) {
   if (!state.run) {
     render(status, []);
     render(summary, []);
+    render(seen, []);
     render(diagnostics, []);
     return container;
   }
@@ -71,6 +141,7 @@ export function renderAnalyze(container, { state, onRun, onStatus }) {
     ]),
     el('p', { class: 'hint', text: 'Open Findings, Program Graph, Data-Flow Analysis or Program Slicing to inspect the result of this run.' }),
   ]);
+  render(seen, dispositionsPanel(run) || []);
 
   render(diagnostics, [
     el('h2', { text: 'Diagnostics' }),

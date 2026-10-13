@@ -191,6 +191,11 @@ class TaintResult:
     iterations: int = 0
     converged: bool = True
     infeasible_edges: List[dict] = field(default_factory=list)
+    #: Flows that a **declared validator guard** cleared before the sink was
+    #: reached.  Each entry says which validator, on which edge, removed which
+    #: atoms for which symbol, so the suppression can be shown as an assumption
+    #: instead of disappearing into "no taint reached this sink".
+    guard_suppressions: List[dict] = field(default_factory=list)
     #: The final :class:`TaintProblem` per function (state queries, explainer).
     problems: Dict[str, object] = field(default_factory=dict)
     notes: List[str] = field(default_factory=list)
@@ -219,6 +224,7 @@ class TaintResult:
                 for fn, params in self.ret_params.items()
             },
             "infeasible_branches": list(self.infeasible_edges),
+            "guard_suppressions": list(self.guard_suppressions),
             "notes": list(self.notes),
         }
 
@@ -260,6 +266,9 @@ class TaintProblem(DataFlowProblem):
         self.entry_atoms = entry_atoms
         self.param_symbols = list(param_symbols)
         self.guards: Dict[Tuple[int, int], List[Tuple[int, str]]] = {}
+        #: ``(src, dst) -> [detail]`` for the guards on that edge, so a
+        #: suppression can be reported with the validator that caused it.
+        self.guard_details: Dict[Tuple[int, int], List[dict]] = {}
         self.infeasible_edges: Set[Tuple[int, int]] = set()
         self._collect_edges()
         self._reachable = self._compute_reachable()
@@ -338,9 +347,10 @@ class TaintProblem(DataFlowProblem):
     def _collect_edges(self) -> None:
         for block in self.cfg.sorted_blocks():
             for edge in block.successors:
-                guard = self._guard_on_edge(block, edge)
+                guard, details = self._guard_on_edge(block, edge)
                 if guard:
                     self.guards[(block.id, edge.dst)] = guard
+                    self.guard_details[(block.id, edge.dst)] = details
                 if edge.kind in ("true", "false") and self._is_constant(edge):
                     self.infeasible_edges.add((block.id, edge.dst))
 
@@ -353,7 +363,7 @@ class TaintProblem(DataFlowProblem):
             return True
         return False
 
-    def _guard_on_edge(self, block: BasicBlock, edge) -> List[Tuple[int, str]]:
+    def _guard_on_edge(self, block: BasicBlock, edge) -> Tuple[List[Tuple[int, str]], List[dict]]:
         """Validator guards carried by an ``if``/``while`` condition.
 
         Only two forms are recognised, because recognising more would require
@@ -366,24 +376,25 @@ class TaintProblem(DataFlowProblem):
         """
         statement = block.statements[-1] if block.statements else None
         if statement is None or not isinstance(statement, (IfStmt, WhileStmt)):
-            return []
+            return [], []
         cond = statement.cond
         if cond is None:
-            return []
+            return [], []
         negated = False
         if isinstance(cond, UnaryOp) and cond.op == "!":
             negated = True
             cond = cond.operand
         if not isinstance(cond, Call) or cond.callee is None:
-            return []
+            return [], []
         rules = self.engine.rules.sanitizer_rules(cond.name)
         validators = [r for r in rules if r.kind == "validator"]
         if not validators:
-            return []
+            return [], []
         applies_to = "false" if negated else "true"
         if edge.kind != applies_to:
-            return []
+            return [], []
         guard: List[Tuple[int, str]] = []
+        details: List[dict] = []
         for validator in validators:
             if validator.argument >= len(cond.args):
                 continue
@@ -397,7 +408,23 @@ class TaintProblem(DataFlowProblem):
                 )
                 continue
             guard.append((symbol_id, validator.context))
-        return guard
+            details.append(
+                {
+                    "symbol_id": symbol_id,
+                    "symbol": target.name,
+                    "context": validator.context,
+                    "validator": validator.id,
+                    "validator_function": cond.name,
+                    "negated": negated,
+                    "guard_edge": edge.kind,
+                    "statement_sid": statement.sid,
+                    "line": statement.line,
+                    "col": statement.col,
+                    "statement_text": self.engine.program.statement_text(statement.sid),
+                    "condition": edge.condition,
+                }
+            )
+        return guard, details
 
     def _compute_reachable(self) -> Set[int]:
         seen: Set[int] = set()
@@ -670,6 +697,7 @@ class TaintEngine:
         result.converged = converged
         result.hits = [hit for run in final_runs.values() for hit in run.hits]
         result.infeasible_edges = self._infeasible_report()
+        result.guard_suppressions = self._guard_suppression_report(result.problems)
         result.notes = list(self.notes)
         result.notes.append(
             "Interprocedural propagation is context-insensitive: a parameter that is tainted "
@@ -690,7 +718,60 @@ class TaintEngine:
                 "condition is a literal constant; statements in those branches are not analysed "
                 "as reachable (see infeasible_branches)."
             )
+        if result.guard_suppressions:
+            validators = sorted({entry["validator"] for entry in result.guard_suppressions})
+            atoms_cleared = sum(len(entry["removed_atoms"]) for entry in result.guard_suppressions)
+            result.notes.append(
+                f"{atoms_cleared} taint atom(s) were cleared on {len(result.guard_suppressions)} "
+                f"declared validator guard(s) ({', '.join(validators)}): CodeTrace does not analyse "
+                "the validator's implementation and assumes it rejects every value unsafe for its "
+                "context (see guard_suppressions).  A cleared atom only means 'nothing reported' "
+                "where a sink consumes that symbol on the guarded edge; the run's dispositions say "
+                "which sink calls that applies to."
+            )
         return result
+
+    def _guard_suppression_report(self, problems: Dict[str, object]) -> List[dict]:
+        """Which declared validator guards actually cleared taint, and where.
+
+        The guards are applied on the ``true``/``false`` edge of an ``if`` whose
+        condition calls a rule-declared validator.  A suppression is only worth
+        reporting when the guard *really* removed an atom, so the check runs
+        after the fixpoint, on the predecessor's converged OUT value.
+
+        Recording it matters because of what it implies: CodeTrace never looks at
+        the validator's implementation, so a suppressed flow is not "no flow was
+        found" -- it is "a flow was found and a declared validator is assumed to
+        reject it".  Without this record the run would report nothing and explain
+        nothing.
+        """
+        report: List[dict] = []
+        for function, problem in sorted(problems.items()):
+            if problem is None:
+                continue
+            for (src, dst), details in sorted(problem.guard_details.items()):
+                value = problem.block_out.get(src, 0)
+                for detail in details:
+                    atoms = problem.atom_texts(problem.get(value, detail["symbol_id"]))
+                    removed = sorted(
+                        text
+                        for text in atoms
+                        if atom_context(text) == detail["context"]
+                    )
+                    if not removed:
+                        continue
+                    entry = dict(detail)
+                    entry["function"] = function
+                    entry["from_block"] = src
+                    entry["to_block"] = dst
+                    entry["removed_atoms"] = removed
+                    entry["assumption"] = (
+                        "the validator is declared by the rule set and its implementation is "
+                        "not analysed: CodeTrace assumes it rejects every value that is unsafe "
+                        f"for context {detail['context']!r}"
+                    )
+                    report.append(entry)
+        return report
 
     def _infeasible_report(self) -> List[dict]:
         out: List[dict] = []

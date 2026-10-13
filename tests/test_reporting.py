@@ -206,6 +206,106 @@ class HtmlReportTests(unittest.TestCase):
                 self.assertIn("never assumed safe", html)
 
 
+class ValidatorSuppressionReportingTests(unittest.TestCase):
+    """A cleared flow must be reported as a cleared flow, never as an absence.
+
+    The engine records the assumption; these tests hold the two published
+    report formats to actually carrying it, because a report that shows zero
+    findings without naming the validator reads as "nothing ever reached the
+    sink" -- which is a different and untrue claim.
+    """
+
+    GUARDED = """
+int main() {
+  string name = input();
+  if (is_safe_command(name)) {
+    system(name);
+  }
+  return 0;
+}
+"""
+
+    def setUp(self):
+        self.program = analyse(self.GUARDED, filename="guarded.ctc")
+        self.report = build_report(self.program, run_id="run-guard")
+        self.dispositions = self.report["summary"]["dispositions"]
+
+    def test_the_run_has_no_findings_and_says_why(self):
+        self.assertEqual(self.report["summary"]["findings"], 0)
+        self.assertEqual(self.dispositions["sink_calls_seen"], 1)
+        self.assertEqual(self.dispositions["reported"], 0)
+        self.assertEqual(self.dispositions["unreported_count"], 1)
+        reason = self.dispositions["unreported_sink_calls"][0]["reason"]
+        self.assertIn("validate_command", reason)
+        self.assertIn("cleared", reason)
+        # The old generic wording claimed no taint arrived; it did arrive.
+        self.assertNotIn("no taint of the required context reached", reason)
+
+    def test_the_guard_record_carries_the_evidence(self):
+        guard = self.dispositions["validator_guards"][0]
+        self.assertEqual(guard["validator"], "validate_command")
+        self.assertEqual(guard["validator_function"], "is_safe_command")
+        self.assertEqual(guard["symbol"], "name")
+        self.assertEqual(guard["context"], "command")
+        self.assertEqual(guard["removed_atoms"], ["src:stdin@command"])
+        self.assertIn("assumes it rejects", guard["assumption"])
+
+    def test_the_limitation_section_states_the_assumption(self):
+        matched = [l for l in self.report["limitations"] if "unreported sink call" in l]
+        self.assertEqual(len(matched), 1)
+        self.assertIn("validate_command", matched[0])
+        self.assertTrue(any("never executed" in l for l in self.report["limitations"]))
+
+    def test_the_report_carries_the_run_notes(self):
+        self.assertTrue(self.report["notes"])
+        self.assertTrue(any("cleared on" in note for note in self.report["notes"]))
+
+    def test_an_unrelated_suppression_is_not_counted_as_hidden(self):
+        # The guard covers ``checked``; the reported finding is about ``other``.
+        # Nothing was hidden by the guard, so the run must not claim otherwise.
+        program = analyse(
+            """
+int main() {
+  string checked = input();
+  string other = input();
+  if (is_safe_command(checked)) {
+    system(other);
+  }
+  return 0;
+}
+"""
+        )
+        report = build_report(program, run_id="run-unrelated")
+        self.assertEqual(report["summary"]["findings"], 1)
+        self.assertEqual(
+            [l for l in report["limitations"] if "unreported sink call" in l], []
+        )
+        self.assertTrue(report["summary"]["dispositions"]["validator_guards"])
+
+    def test_a_run_without_guards_has_no_suppression_limitation(self):
+        program = analyse(VULNERABLE, filename="plain.ctc")
+        report = build_report(program, run_id="run-plain")
+        self.assertEqual(report["summary"]["dispositions"]["validator_guards"], [])
+        self.assertEqual(
+            [l for l in report["limitations"] if "unreported sink call" in l], []
+        )
+
+    def test_the_html_report_shows_the_guard_instead_of_an_empty_verdict(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "guarded.html")
+            write_html_report(self.program, path, run_id="run-guard")
+            with open(path, encoding="utf-8") as handle:
+                html = handle.read()
+        self.assertIn("What the engine saw but did not report", html)
+        self.assertIn("validate_command", html)
+        self.assertIn("assumption", html)
+        self.assertIn("guards name for context 'command' at line 3", html)
+        self.assertIn("src:stdin@command", html)
+        self.assertIn("inspected and not reported (1)", html)
+        # The clear statement that the run is not a proof survives alongside it.
+        self.assertIn("not a proof of exploitability", html)
+
+
 class EvaluationHarnessTests(unittest.TestCase):
     def test_the_labelled_corpus_harness_runs_and_writes_json(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -241,6 +341,37 @@ class EvaluationHarnessTests(unittest.TestCase):
         for key in ("file", "label", "verdict", "reasons", "analysis_ok", "findings",
                     "reported_rules", "seconds"):
             self.assertIn(key, first)
+
+    def test_every_corpus_case_enters_exactly_one_metric_group(self):
+        # The documentation states the coverage as "17 expectations in 15 files,
+        # 8 file-level cases, 6 diagnostic-only cases".  That accounting has to
+        # be a property of the corpus rather than a sentence in a document, or a
+        # later edit can quietly make "29 cases" sound like 29 detections.
+        with open(os.path.join(ROOT, "evaluation", "expectations.json"), "r", encoding="utf-8") as handle:
+            expectations = json.load(handle)
+        cases = expectations["cases"]
+        finding_level = [c for c in cases if c.get("expect")]
+        file_level = [c for c in cases if c["label"] in ("safe", "sanitized")]
+        diagnostic_only = [c for c in cases if c["label"] in ("unsupported", "syntax_error")]
+
+        self.assertEqual(len(finding_level) + len(file_level) + len(diagnostic_only), len(cases),
+                         "the three metric groups partition the corpus")
+        files = [c["file"] for c in cases]
+        self.assertEqual(len(set(files)), len(files), "each file appears once")
+        # A case may not be counted twice: an expectation-bearing case must not
+        # also be a file-level case, and vice versa.
+        self.assertEqual([c for c in finding_level if c["label"] in ("safe", "sanitized")], [])
+        self.assertEqual([c for c in file_level if c.get("expect")], [])
+        # The diagnostic-only cases declare no expectation and no safe label, so
+        # they cannot enter a precision or recall denominator.
+        for case in diagnostic_only:
+            self.assertEqual(case.get("expect"), [], case["file"])
+            self.assertTrue(case.get("expect_diagnostics"), case["file"])
+        # And the counts the docs quote are the counts in the file.
+        self.assertEqual(sum(len(c.get("expect") or []) for c in cases), 17)
+        self.assertEqual(len(finding_level), 15)
+        self.assertEqual(len(file_level), 8)
+        self.assertEqual(len(diagnostic_only), 6)
 
     def test_the_corpus_is_separate_from_the_unit_tests(self):
         with open(os.path.join(ROOT, "evaluation", "expectations.json"), "r", encoding="utf-8") as handle:

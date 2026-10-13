@@ -214,6 +214,65 @@ def render_html(
         parts.append(f"<div>{_escape(key)}</div><div>{_escape(value)} s</div>")
     parts.append("</div>")
 
+    # -- what was not reported -------------------------------------------
+    # A report with zero findings is the easiest result to misread, so the HTML
+    # report carries the same account as the page: which sink calls were looked
+    # at and turned down, and which branch guards cleared a flow on the way.
+    dispositions = (report.get("summary") or {}).get("dispositions") or {}
+    unreported = dispositions.get("unreported_sink_calls") or []
+    guards = dispositions.get("validator_guards") or []
+    pruned = dispositions.get("statically_pruned_branches") or []
+    notes = report.get("notes") or []
+    parts.append("<h2>What the engine saw but did not report</h2>")
+    parts.append("<div class='kv'>")
+    for label, value in (
+        ("sink calls inspected", dispositions.get("sink_calls_seen")),
+        ("reported as findings", dispositions.get("reported")),
+        ("inspected but not reported", dispositions.get("unreported_count")),
+        ("branches pruned as unreachable", len(pruned)),
+    ):
+        if value is not None:
+            parts.append(f"<div>{_escape(label)}</div><div>{_escape(value)}</div>")
+    parts.append("</div>")
+
+    if guards:
+        parts.append(
+            "<p class='limits'>A rule-declared validator guards part of this program: the flows "
+            "through that guard were cleared and the validator's implementation is not analysed, "
+            "so this run assumes it rejects every value that is unsafe for its context.</p>"
+        )
+        parts.append("<ul class='limits'>")
+        for guard in guards:
+            removed = ", ".join(guard.get("removed_atoms") or [])
+            parts.append(
+                "<li><b>assumption</b>: "
+                f"{_escape(guard.get('validator'))}() guards {_escape(guard.get('symbol'))} for "
+                f"context '{_escape(guard.get('context'))}' at line {_escape(guard.get('line'))}"
+                f"{' (removed: ' + _escape(removed) + ')' if removed else ''}</li>"
+            )
+        parts.append("</ul>")
+
+    if unreported:
+        parts.append(
+            f"<p>Sink calls that were inspected and not reported ({len(unreported)}):</p>"
+        )
+        parts.append("<ul class='limits'>")
+        for entry in unreported:
+            parts.append(
+                f"<li>{_escape(entry.get('function'))}() line {_escape(entry.get('line'))} "
+                f"({_escape(entry.get('sink_rule'))}): {_escape(entry.get('reason'))}</li>"
+            )
+        parts.append("</ul>")
+    note = dispositions.get("note")
+    if note:
+        parts.append(f"<p>{_escape(note)}</p>")
+
+    if notes:
+        parts.append("<h3>Notes recorded for this run</h3><ul class='limits'>")
+        for entry in notes:
+            parts.append(f"<li>{_escape(entry)}</li>")
+        parts.append("</ul>")
+
     # -- limitations -----------------------------------------------------
     parts.append("<h2>Analysis limitations</h2><ul class='limits'>")
     for limitation in report["limitations"]:
