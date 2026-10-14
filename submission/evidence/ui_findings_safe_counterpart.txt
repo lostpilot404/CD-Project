@@ -22,7 +22,6 @@ all functions
 Compare two runs on the Reports page to filter findings by fixed/open.
 Sort by
 severity
-severity
 line
 rule
 category

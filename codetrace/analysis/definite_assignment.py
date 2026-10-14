@@ -153,7 +153,9 @@ class DefiniteAssignment(DataFlowProblem):
         return sorted(self.domain.atoms_of(result.in_values.get(block_id, 0)))
 
     def to_json(self, result: DataFlowResult) -> dict:
-        payload = result.to_json(include_atoms=False)
+        # Keep the per-block IN/OUT atom lists: the Data-Flow page prints them
+        # next to |IN| and |OUT|, and docs/API.md promises them.
+        payload = result.to_json(include_atoms=True)
         payload["def"] = {b: self.domain.atoms_of(v) for b, v in sorted(self.defs.items())}
         return payload
 

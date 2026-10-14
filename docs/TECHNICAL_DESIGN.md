@@ -46,14 +46,14 @@ itself. `python3 -m codetrace.api` is the whole deployment.
 | --- | --- | --- | --- |
 | `codetrace/frontend` | 9 | 3226 | tokens, lexer, grammar (NULLABLE/FIRST/FOLLOW, closure, GOTO, canonical/LALR/SLR automata), LR tables and parser, AST nodes, grammar documentation, pipeline (`parse_source`, cached `parser_tables`) |
 | `codetrace/semantics` | 4 | 1352 | scopes and symbol table, external resolution through the rule set, type checks, per-statement accesses (reads/writes/definitions) |
-| `codetrace/analysis` | 11 | 4058 | CFG, data-flow framework + reaching definitions / liveness / definite assignment, taint, dependency graph, slicing, `Program` orchestration |
+| `codetrace/analysis` | 11 | 4064 | CFG, data-flow framework + reaching definitions / liveness / definite assignment, taint, dependency graph, slicing, `Program` orchestration |
 | `codetrace/rules` | 3 | 1026 | rule model and validation, declarative rule language parser, built-in rule loader (plus `builtin/standard.ctrule`) |
 | `codetrace/findings` | 3 | 1225 | finding model and stable identity, run comparison, explanation and certainty |
 | `codetrace/reporting` | 3 | 650 | JSON report, self-contained HTML report |
 | `codetrace/api` | 4 | 1108 | HTTP server, routing, request validation, limits, schemas catalogue, `python3 -m` entry point |
 | `codetrace/*.py` | 2 | 22 | version constants and the package docstring |
 | `tests/` | 17 | 5465 | lexer, parser, semantics, CFG, data flow, taint, slicing, rules, API, reporting, end-to-end workflow, audit and mutation-check self-tests |
-| `frontend/` | 21 | 3193 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
+| `frontend/` | 21 | 3196 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
 | `frontend/tests/` | 4 | 1731 | stub DOM, harness, library tests, view tests against a real engine |
 | `evaluation/` | 2 | 754 | labelled corpus harness and `expectations.json` |
 | `scripts/` | 5 | 1402 | dev server, full test run, corpus evaluation, independent audit, mutation check |

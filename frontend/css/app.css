@@ -166,7 +166,10 @@ code, kbd, pre, .mono { font-family: var(--mono); font-size: .9em; }
 }
 .button:hover { background: var(--surface-alt); }
 .button--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.button--primary:hover { filter: brightness(1.08); }
+/* `.button:hover` above has the same specificity and would otherwise swap the
+   accent background for the light surface while the text stays white, making
+   the label of a hovered primary button invisible. */
+.button--primary:hover { background: var(--accent); filter: brightness(1.08); }
 .button--ghost { background: transparent; }
 .button--small { padding: .2rem .5rem; font-size: .82rem; }
 .button[aria-pressed="true"] { background: var(--accent-weak); border-color: var(--accent); }

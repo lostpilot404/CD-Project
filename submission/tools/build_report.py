@@ -459,7 +459,7 @@ TABLE(["Evidence", "Location in repository"], [
     ["Taint battery outputs (first run and corrected run)", "submission/evidence/logs/battery_2_first_run.txt, battery_2.txt"],
     ["Exported report for command injection", "submission/evidence/report_command_injection.json and .html"],
     ["Browser capture summaries", "submission/evidence/ui_*.txt"],
-    ["Screenshots", "submission/screenshots/01–10"],
+    ["Screenshots", "submission/screenshots/01–12 (plus 03b/04b close-ups)"],
     ["Architecture figure and its generator", "submission/figures/architecture.png; submission/tools/make_architecture_figure.py"],
     ["Probe and battery sources", "submission/tools/probes/"],
 ], widths=[2.8, 3.8], caption="Table A1. Where the evidence is")

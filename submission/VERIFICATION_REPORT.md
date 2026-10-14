@@ -66,16 +66,21 @@ This analysis is partial: the parser recovered from 2 syntax error(s) ...
 
 ## 5. Browser verification
 
-The app was started with `scripts/serve.sh --port 8000` after the parser fix (the earlier server had been started before the fix and was restarted). The capture tool `submission/tools/ui_capture.mjs` drives headless Chromium with `puppeteer-core` and writes 10 screenshots to `submission/screenshots/`. The run reported 0 console errors and 0 page errors. Summary of what the screenshots show:
+The app was started with `scripts/serve.sh --port 8000`. The capture tool `submission/tools/ui_capture.mjs` drives headless Chromium with `puppeteer-core` and writes the screenshots to `submission/screenshots/`. The set was re-captured on 2026-10-14 (Chromium 153, the build bundled in the npm package `@sparticuz/chromium`, with DejaVu Sans / DejaVu Sans Mono available to fontconfig). The run reported 0 console errors and 0 page errors (`evidence/ui_capture_log.json`). Summary of what the screenshots show:
 
 - Top bar: `engine 1.0.0`, `rules builtin-3387b7dcd97a95f3`, `167 states / 0 conflicts`.
-- 02/03: the command-injection run, the finding list and the finding detail with an 8-step evidence path.
-- 04: the program graph at natural width.
-- 05: reaching definitions for `build_command()`, converged.
+- 02: the completed command-injection run — options, run id and timing, the summary (1 finding, HIGH), what the engine inspected but did not report, no diagnostics.
+- 03 / 03b: the finding list and the finding detail with the 8-step evidence path, limitations, remediation and highlighted source context (03b is a 2× close-up of the record).
+- 04 / 04b: the program dependency graph with the sink statement selected and its per-statement results in the side panel (04b is the canvas alone). The layered layout is drawn at natural width and normally scrolls; these two frames were taken at 1920px with the stylesheet's 110rem layout cap lifted so the whole graph is visible at once — a presentation setting only.
+- 05: reaching definitions for `main()`, converged in 2 iterations, with block IN/OUT sets, per-statement states and the selected sink statement.
+- 06: the backward slice from the sink with the reason each statement is included and the slice subgraph.
 - 07: the reports page (JSON and HTML export, run comparison).
 - 08: the safe counterpart, 0 findings, with the explicit "not that the program is safe" message.
 - 09: the syntax-error diagnostics with the corrected expected-token lists.
 - 10: the unsupported `switch` statement, reported as unsupported and not guessed at.
+- 11 / 12: `loop_carried.ctc` — the control-flow graph of `main()` with its `true`, `false`, `loop-back` and `return` edges and the loop body selected (control-dependent on `i < 3`), and reaching definitions over that loop: 10 worklist iterations (`0 → 1 → 2 → 3 → 4 → 1 → …`) before the fixed point.
+
+The earlier capture (2026-10-13) had three presentation defects that this one removes: the browser had no font with the `∪`, `→` and `∅` glyphs, so the data-flow equations and the processing order rendered with gaps; the program graph was cut off at the right edge of the canvas; and the *Run analysis* button appeared blank because the headless pointer was left hovering over it. The last one exposed a stylesheet bug, now fixed: `.button:hover` replaced the accent background of a primary button while its text stayed white. Rendering the `∅` glyph exposed a second defect, also fixed: the data-flow endpoint omitted the per-block `in` / `out` atom lists (`include_atoms=False`), so the Data-Flow page printed `∅` next to a non-zero `|IN|` or `|OUT|`; the three problem classes now return the lists that `docs/API.md` promises.
 
 The export of the command-injection run is in `evidence/report_command_injection.json` (schema 1.0, 1 finding, `analysis_complete: true`) and `evidence/report_command_injection.html`.
 
