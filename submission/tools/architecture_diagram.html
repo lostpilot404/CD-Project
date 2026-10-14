@@ -1,0 +1,205 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #fff; font-family: "Open Sans", "DejaVu Sans", sans-serif; }
+  svg { display: block; }
+  .layer { fill: #f7f9fc; stroke: #9aa5b5; stroke-width: 1.2; }
+  .layer-title { font-size: 15px; font-weight: 700; fill: #1f2937; }
+  .layer-sub { font-size: 11.5px; fill: #4b5563; }
+  .box { fill: #ffffff; stroke: #2f5496; stroke-width: 1.3; }
+  .box-ui { fill: #eef3fb; stroke: #2f5496; }
+  .box-stage { fill: #ffffff; stroke: #1f4d78; stroke-width: 1.4; }
+  .box-rules { fill: #fff7e6; stroke: #b45f06; stroke-width: 1.4; }
+  .box-out { fill: #edf7ee; stroke: #2e7d32; stroke-width: 1.4; }
+  .label { font-size: 12.5px; font-weight: 600; fill: #111827; text-anchor: middle; }
+  .label-l { font-size: 12.5px; font-weight: 700; fill: #111827; }
+  .small { font-size: 10.5px; fill: #374151; text-anchor: middle; }
+  .small-l { font-size: 10.5px; fill: #374151; }
+  .edge { stroke: #1f2937; stroke-width: 1.4; fill: none; marker-end: url(#arrow); }
+  .edge-dashed { stroke: #b45f06; stroke-width: 1.3; fill: none; stroke-dasharray: 5 3; marker-end: url(#arrow-o); }
+  .edge-label { font-size: 10.5px; fill: #1f2937; text-anchor: middle; }
+  .stepno { font-size: 10px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+</style>
+</head>
+<body>
+<svg id="d" xmlns="http://www.w3.org/2000/svg" width="1040" height="880" viewBox="0 0 1040 880"></svg>
+<script>
+const svg = document.getElementById('d');
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, text) {
+  const n = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (text !== undefined) n.textContent = text;
+  svg.appendChild(n);
+  return n;
+}
+// markers
+const defs = el('defs', {});
+for (const [id, color] of [['arrow', '#1f2937'], ['arrow-o', '#b45f06']]) {
+  const m = document.createElementNS(NS, 'marker');
+  m.setAttribute('id', id); m.setAttribute('viewBox', '0 0 10 10'); m.setAttribute('refX', '9'); m.setAttribute('refY', '5');
+  m.setAttribute('markerWidth', '7'); m.setAttribute('markerHeight', '7'); m.setAttribute('orient', 'auto-start-reverse');
+  const p = document.createElementNS(NS, 'path'); p.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z'); p.setAttribute('fill', color);
+  m.appendChild(p); defs.appendChild(m);
+}
+function rect(x, y, w, h, cls, r = 6) { return el('rect', { x, y, width: w, height: h, rx: r, ry: r, class: cls }); }
+function text(x, y, cls, s) { return el('text', { x, y, class: cls }, s); }
+// multi-line centred text; lines: array of [string, class]
+function lines(x, y, arr, lh = 14) {
+  arr.forEach(([s, cls], i) => text(x, y + i * lh, cls, s));
+}
+function wrap(s, maxChars) {
+  const words = s.split(' '); const out = []; let cur = '';
+  for (const w of words) { if ((cur + ' ' + w).trim().length > maxChars && cur) { out.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); }
+  if (cur) out.push(cur); return out;
+}
+function box(x, y, w, h, title, sub, cls = 'box-stage', subMax = 30) {
+  rect(x, y, w, h, cls);
+  const subLines = sub ? wrap(sub, subMax) : [];
+  const total = 1 + subLines.length;
+  const lh = 13;
+  const startY = y + h / 2 - ((total - 1) * lh) / 2 + 4;
+  text(x + w / 2, startY, 'label', title);
+  subLines.forEach((s, i) => text(x + w / 2, startY + 14 + i * lh, 'small', s));
+  return { x, y, w, h, cx: x + w / 2, cy: y + h / 2, r: x + w, b: y + h };
+}
+function arrow(x1, y1, x2, y2, cls = 'edge') { return el('path', { d: `M ${x1} ${y1} L ${x2} ${y2}`, class: cls }); }
+function curve(x1, y1, x2, y2, cls = 'edge') {
+  const mx = (x1 + x2) / 2;
+  return el('path', { d: `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`, class: cls });
+}
+
+const W = 1040, M = 16;
+// ------------------------------------------------------------ Layer 1: browser
+let y = 10;
+rect(M, y, W - 2 * M, 118, 'layer', 8);
+text(M + 12, y + 20, 'layer-title', 'Presentation layer — browser interface (frontend/)');
+text(M + 12, y + 36, 'layer-sub', 'Single-page application in HTML, CSS and vanilla ES modules; no build step. Each page is a view over one analysis run.');
+const pages = ['Overview', 'Analyze Code', 'Findings', 'Program Graph', 'Data-Flow Analysis', 'Program Slicing', 'Rule Editor', 'Reports', 'Documentation'];
+{
+  const gap = 8, bw = (W - 2 * M - 24 - gap * (pages.length - 1)) / pages.length, bh = 48;
+  pages.forEach((p, i) => {
+    const x = M + 12 + i * (bw + gap);
+    rect(x, y + 52, bw, bh, 'box-ui');
+    const ls = wrap(p, 11);
+    const sy = y + 52 + bh / 2 + 4 - ((ls.length - 1) * 13) / 2;
+    ls.forEach((s, k) => text(x + bw / 2, sy + k * 13, 'label', s));
+  });
+}
+// link between layer 1 and 2
+let yA = y + 118;
+let yB = yA + 58;
+arrow(W / 2 - 24, yA + 4, W / 2 - 24, yB - 4);
+arrow(W / 2 + 24, yB - 4, W / 2 + 24, yA + 4);
+el('text', { x: W / 2 - 34, y: yA + 24, class: 'edge-label', style: 'text-anchor:end' }, 'HTTP requests (JSON)');
+el('text', { x: W / 2 - 34, y: yA + 37, class: 'edge-label', style: 'text-anchor:end' }, 'POST /api/analyze · GET /api/runs/{id}/…');
+el('text', { x: W / 2 + 34, y: yA + 24, class: 'edge-label', style: 'text-anchor:start' }, 'JSON responses');
+el('text', { x: W / 2 + 34, y: yA + 37, class: 'edge-label', style: 'text-anchor:start' }, 'findings · graphs · data-flow · slices · reports');
+// ------------------------------------------------------------ Layer 2: API server
+y = yB;
+rect(M, y, W - 2 * M, 112, 'layer', 8);
+text(M + 12, y + 20, 'layer-title', 'Service layer — HTTP API server (codetrace/api, Python standard-library http.server)');
+text(M + 12, y + 36, 'layer-sub', 'Serves the static interface and a JSON API; keeps completed runs in memory; never executes the analysed program.');
+{
+  const items = [
+    ['Request validation', 'content type, size and line limits, parameter checks'],
+    ['Run store', 'in-memory results per run id'],
+    ['Rule validation', 'POST /api/rules/validate'],
+    ['Run comparison', 'POST /api/compare: new / resolved / persistent / moved'],
+    ['Report rendering', 'JSON (schema 1.0) and self-contained HTML'],
+  ];
+  const gap = 10, bw = (W - 2 * M - 24 - gap * (items.length - 1)) / items.length, bh = 48;
+  items.forEach(([t, s], i) => box(M + 12 + i * (bw + gap), y + 52, bw, bh, t, s, 'box', 30));
+}
+yA = y + 112;
+yB = yA + 56;
+arrow(W / 2 - 24, yA + 4, W / 2 - 24, yB - 4);
+arrow(W / 2 + 24, yB - 4, W / 2 + 24, yA + 4);
+el('text', { x: W / 2 - 34, y: yA + 24, class: 'edge-label', style: 'text-anchor:end' }, 'analyse_source(source, rule set, options)');
+el('text', { x: W / 2 - 34, y: yA + 37, class: 'edge-label', style: 'text-anchor:end' }, 'codetrace/analysis/pipeline.py');
+el('text', { x: W / 2 + 34, y: yA + 24, class: 'edge-label', style: 'text-anchor:start' }, 'AnalysisResult');
+el('text', { x: W / 2 + 34, y: yA + 37, class: 'edge-label', style: 'text-anchor:start' }, 'findings · diagnostics · graphs · metrics');
+// ------------------------------------------------------------ Layer 3: engine
+y = yB;
+const engineRect = rect(M, y, W - 2 * M, 100, 'layer', 8);
+text(M + 12, y + 20, 'layer-title', 'Analysis layer — compiler-based engine (codetrace/frontend, semantics, analysis, rules, findings, reporting)');
+text(M + 12, y + 36, 'layer-sub', 'Pure Python without third-party dependencies. The stages run in the order shown; every later stage consumes the data structures of the earlier ones.');
+
+// Row A: compiler front end (4 stages)  — leave room on the right for the rule-set box
+const rowAy = y + 58, rowH = 74;
+const rulesW = 190;
+const rowRight = W - M - 12 - rulesW - 24;
+const rowLeft = M + 12;
+const gapA = 34;
+const bwA = (rowRight - rowLeft - gapA * 3) / 4;
+const A = [
+  ['1  Lexer', 'tokens with line/column; LEX diagnostics for unsupported constructs'],
+  ['2  LR parser', 'table-driven; LALR(1) by default, canonical LR(1) or SLR(1); error recovery'],
+  ['3  Abstract syntax tree', 'typed nodes with source spans for every construct'],
+  ['4  Semantic analysis', 'scoped symbol tables, stable symbol ids, externals from the rule set; SEM diagnostics'],
+].map(([t, s], i) => box(rowLeft + i * (bwA + gapA), rowAy, bwA, rowH, t, s, 'box-stage', 32));
+for (let i = 0; i < 3; i++) arrow(A[i].r + 2, A[i].cy, A[i + 1].x - 2, A[i + 1].cy);
+
+// Row B: analyses (6 stages) across the full width
+const rowBy = rowAy + rowH + 70;
+const gapB = 26;
+const fullRight = W - M - 12;
+const bwB = (fullRight - rowLeft - gapB * 5) / 6;
+const B = [
+  ['5  Control-flow graph', 'basic blocks per function; typed edges; reachability'],
+  ['6  Data-flow analyses', 'worklist fixpoint: reaching definitions, live variables, definite assignment'],
+  ['7  Taint engine', 'interprocedural summaries; contexts, sanitizers, validators'],
+  ['8  Dependency graph', 'data, control, call, return, taint and sanitize edges with reasons'],
+  ['9  Program slicing', 'backward, forward and security slices with justifications'],
+  ['10  Findings', 'evidence paths, certainty, limitations, remediation; diagnostics and metrics'],
+].map(([t, s], i) => box(rowLeft + i * (bwB + gapB), rowBy, bwB, rowH + 6, t, s, 'box-stage', 24));
+for (let i = 0; i < 5; i++) arrow(B[i].r + 2, B[i].cy, B[i + 1].x - 2, B[i + 1].cy);
+// wrap arrow from stage 4 to stage 5
+{
+  const x1 = A[3].cx, y1 = A[3].b + 2, x2 = B[0].cx, y2 = B[0].y - 2;
+  const ym = (y1 + y2) / 2;
+  el('path', { d: `M ${x1} ${y1} L ${x1} ${ym} L ${x2} ${ym} L ${x2} ${y2}`, class: 'edge' });
+  el('text', { x: x2 + 14, y: ym - 5, class: 'edge-label', style: 'text-anchor:start' }, 'AST + symbol tables');
+  window.__ym = ym;
+}
+// Rule set side input (right of row A)
+const rx = fullRight - rulesW, ry = rowAy - 4;
+rect(rx, ry, rulesW, rowH + 8, 'box-rules');
+text(rx + rulesW / 2, ry + 18, 'label', 'Security rule set (.ctrule)');
+['built-in rules + optional custom rules', 'sources · sinks · sanitizers ·', 'validators · flows', 'parsed by its own LR(1) grammar and', 'validated before use'].forEach((s, i) => text(rx + rulesW / 2, ry + 32 + i * 11.5, 'small', s));
+// dashed arrows from the rule set to stage 4 (externals) and stage 7 (flows)
+arrow(rx - 2, A[3].cy, A[3].r + 3, A[3].cy, 'edge-dashed');
+{
+  const x1 = rx + rulesW / 2, y1 = ry + rowH + 10, x2 = B[2].cx, y2 = B[2].y - 2;
+  const ym = window.__ym + 24;
+  el('path', { d: `M ${x1} ${y1} L ${x1} ${ym} L ${x2} ${ym} L ${x2} ${y2}`, class: 'edge-dashed' });
+  el('text', { x: x2 + 14, y: ym - 5, class: 'edge-label', style: 'text-anchor:start; fill:#b45f06' }, 'rule-declared sources, sinks, sanitizers, validators and flows');
+}
+
+// Outputs row
+const outY = rowBy + rowH + 6 + 40;
+const outs = [
+  ['Findings with evidence paths', 'stable id, severity, certainty (confirmed / approximate / unproven), remediation', 'box-out'],
+  ['Diagnostics', 'LEX / SYN / SEM / CFG codes with line and column; partial-analysis reasons', 'box-out'],
+  ['Graphs and tables', 'CFG, dependency graph, IN/OUT sets, slices served per run', 'box-out'],
+  ['Reports', 'JSON report (schema 1.0) and HTML report; run comparison', 'box-out'],
+];
+{
+  const gap = 16, bw = (fullRight - rowLeft - gap * 3) / 4, bh = 58;
+  const O = outs.map(([t, s, c], i) => box(rowLeft + i * (bw + gap), outY, bw, bh, t, s, c, 38));
+  // arrows from stage 10 down and to each output
+  const x1 = B[5].cx, y1 = B[5].b + 2;
+  const ym = outY - 18;
+  el('path', { d: `M ${x1} ${y1} L ${x1} ${ym} L ${O[0].cx} ${ym}`, class: 'edge', style: 'marker-end:none' });
+  O.forEach((o) => arrow(o.cx, ym, o.cx, o.y - 2));
+  text(rowLeft + 2, ym - 6, 'small-l', 'results of one run (identified by run id; the analysed text is never executed, imported or written to disk)');
+  const bottom = outY + bh + 14;
+  engineRect.setAttribute('height', bottom - y);
+  svg.setAttribute('height', bottom + 10);
+  svg.setAttribute('viewBox', `0 0 ${W} ${bottom + 10}`);
+}
+</script>
+</body>
+</html>
