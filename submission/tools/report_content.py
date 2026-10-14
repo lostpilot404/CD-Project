@@ -355,7 +355,7 @@ CHAPTER3 = [
      ],
      [1.45, 1.9, 3.15]),
     ("h3", "3.3.1 Source processing and lexical analysis"),
-    ("p", "The engine first normalises the submitted text and checks it against the input limits. The "
+    ("p", "The engine first checks the submitted text against the input limits of 512 KiB and 20,000 lines. The "
           "lexer is a hand-written deterministic scanner over the CT-C token vocabulary: keywords, "
           "identifiers, integer, floating-point, character and string literals, operators and "
           "punctuation. Every token records its line, column and half-open character range, and these "
@@ -400,7 +400,7 @@ CHAPTER3 = [
     ("p", "Semantic analysis walks the tree with a stack of scopes. Each declaration creates exactly one "
           "`Symbol` with an integer identity that is unique within the run; later phases refer to symbols "
           "by this identity rather than by name, which is what makes shadowed and re-declared variables "
-          "unambiguous (the identifier `value` in the examples of Chapter 4 appears as `s2:value`). The "
+          "unambiguous (the interface displays a symbol by identity and name, for example `s6:command` in Figure 4.7). The "
           "analyzer reports undeclared identifiers (SEM001), duplicate declarations and redefinitions "
           "(SEM002, SEM003), type mismatches in assignments, conditions, calls and returns (SEM004, SEM005, "
           "SEM016), `void` variables and parameters (SEM006, SEM007), `break` or `continue` outside a loop "
@@ -419,9 +419,8 @@ CHAPTER3 = [
           "edges to the loop exit, the loop header and the function exit respectively. Edges are typed "
           "with these kinds, which later lets the dependency graph attach control dependences and lets "
           "the interface draw each edge kind distinctly. A breadth-first traversal from the entry block "
-          "computes reachability; statements in unreachable blocks are reported with the CFG001 "
-          "diagnostic and excluded from the data-flow domains. Figure 4.8 shows the graph of a function "
-          "with a loop."),
+          "computes reachability, and the first statement of every unreachable region is reported with the "
+          "CFG001 diagnostic. Figure 4.8 shows the graph of a function with a loop."),
     ("h3", "3.3.5 Data-flow analysis: reaching definitions and liveness"),
     ("p", "The data-flow analyses are instances of a single framework in the `dataflow` module. A "
           "problem is described by a domain of facts represented as a bit vector, a direction, a "
@@ -483,8 +482,9 @@ CHAPTER3 = [
           "sanitizers (functions that neutralise given contexts), validators (predicates whose true "
           "branch is assumed safe) and flows (named pairings of source and sink categories that produce "
           "findings). The language has its own grammar of 40 productions; it is parsed by the same LR "
-          "machinery as CT-C, with a 78-state conflict-free LALR(1) table, and validated for unknown "
-          "references, duplicate identifiers and inconsistent declarations before use. Rule files are "
+          "machinery as CT-C, with a 78-state conflict-free LALR(1) table, and validated before use for "
+          "duplicate identifiers, unknown contexts and severities, and flows that reference undeclared "
+          "sources, sinks or sanitizers. Rule files are "
           "data: they can declare functions, contexts and severities, but they contain no expressions or "
           "statements and can never execute anything. The built-in rule set models standard input, "
           "integer input, environment variables, command-line arguments and file contents as sources; "
@@ -497,7 +497,7 @@ CHAPTER3 = [
     ("p", "Rule evaluation is the final analytical step. For every call to a sink the engine checks "
           "whether the argument at the declared position carries an atom of the declared context whose "
           "source category is paired with the sink by an enabled flow. If it does, the `explain` module "
-          "reconstructs the shortest evidence path from source to sink over the taint edges, classifies "
+          "reconstructs the evidence path from source to sink from the recorded taint trace, classifies "
           "the finding and records its remediation. If it does not, the sink call is still recorded, "
           "together with the reason—no taint of the required context reached it, the statement lies in a "
           "branch whose condition is a literal constant, or the taint was cleared on a guarded edge by a "
@@ -540,8 +540,9 @@ CHAPTER4 = [
      ],
      [1.2, 2.4, 2.9]),
     ("h2", "4.2 Backend Implementation: Analysis Engine and HTTP API"),
-    ("p", "The engine is invoked through `analyse_source(source, filename, rules, options)`, which "
-          "returns an `AnalysisResult` containing the parsed program, the per-function CFGs and "
+    ("p", "The engine is invoked through `analyse_source(source, filename, rules, parser_mode, "
+          "run_dependencies, run_slicing, include_builtin_rules)`, which returns a `Program` object "
+          "containing the parsed program, the per-function CFGs and "
           "data-flow results, the taint facts, the dependency graph, the slice engine, the findings, the "
           "diagnostics and the metrics. The function enforces the input limits before lexing, times each "
           "stage, and records the partial-analysis reasons. All numbers shown in the interface—token, "
