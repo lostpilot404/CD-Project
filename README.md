@@ -33,6 +33,45 @@ analysis*. Start with `docs/USER_GUIDE.md` if you want the guided tour.
 No third-party package is needed anywhere in the pipeline: there is no
 `requirements.txt` because there are no requirements beyond Python 3.11.
 
+## Screenshots
+
+Captured from the running application by `submission/tools/ui_capture.mjs`
+(headless Chromium driving the real interface; every value shown is engine
+output for `examples/vulnerable/command_injection.ctc` unless stated). The full
+set, including the safe counterpart, a syntax error and an unsupported
+construct, is in [`submission/screenshots/`](submission/screenshots/).
+
+**A completed analysis** — the source, the options used, the run id and timing,
+the summary (1 finding, HIGH, command-injection; 5 statements / 4 blocks / 7
+dependency edges), what the engine inspected but did not report, and the
+diagnostics panel:
+
+![Analyze Code after a completed run](submission/screenshots/02-analyze-vulnerable-run.png)
+
+**A finding with its evidence path** — severity, rule, certainty, source and
+sink, why it was reported, the eight-step path from `input()` to `system()`
+across the call to `build_command()`, the limitations, the remediation and the
+source context with the path lines highlighted:
+
+![Finding detail with the evidence path](submission/screenshots/03b-finding-evidence-path-closeup.png)
+
+**The program dependency graph** — typed edges (taint in red, call/return in
+blue, define in purple) with the sink statement selected; the side panel shows
+that statement's reaching definitions, live variables, taint atoms and control
+dependencies as the engine computed them:
+
+![Program dependency graph](submission/screenshots/04-program-graph.png)
+
+**A data-flow view** — reaching definitions in `main()`: the equations, the
+worklist iterations and processing order, the IN/OUT bit-vector of every basic
+block and the per-statement states obtained by replaying the transfer function:
+
+![Reaching definitions in main()](submission/screenshots/05-dataflow.png)
+
+For a loop, see `11-cfg-loop-carried.png` (the control-flow graph with its
+loop-back edge) and `12-dataflow-loop-carried.png` (ten worklist iterations
+before the fixed point).
+
 ```bash
 scripts/tests.sh                 # every suite: engine, API, reporting, workflow, interface
 scripts/tests.sh engine          # Python suites only (no Node needed)

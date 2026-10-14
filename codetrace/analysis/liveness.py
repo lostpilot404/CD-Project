@@ -137,7 +137,9 @@ class Liveness(DataFlowProblem):
         return sorted(self.domain.atoms_of(bits))
 
     def to_json(self, result: DataFlowResult) -> dict:
-        payload = result.to_json(include_atoms=False)
+        # Keep the per-block IN/OUT atom lists: the Data-Flow page prints them
+        # next to |IN| and |OUT|, and docs/API.md promises them.
+        payload = result.to_json(include_atoms=True)
         payload["use"] = {b: self.domain.atoms_of(v) for b, v in sorted(self.use.items())}
         payload["def"] = {b: self.domain.atoms_of(v) for b, v in sorted(self.defs.items())}
         return payload

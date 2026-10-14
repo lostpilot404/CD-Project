@@ -161,7 +161,9 @@ class ReachingDefinitions(DataFlowProblem):
         return sorted(out, key=lambda d: (d.offset, d.id))
 
     def to_json(self, result: DataFlowResult) -> dict:
-        payload = result.to_json(include_atoms=False)
+        # Keep the per-block IN/OUT atom lists: the Data-Flow page prints them
+        # next to |IN| and |OUT|, and docs/API.md promises them.
+        payload = result.to_json(include_atoms=True)
         payload["gen"] = {b: self.domain.atoms_of(v) for b, v in sorted(self.gen.items())}
         payload["kill"] = {b: self.domain.atoms_of(v) for b, v in sorted(self.kill.items())}
         payload["definitions"] = [d.to_json() for d in sorted(self.definitions.values(), key=lambda d: d.id)]

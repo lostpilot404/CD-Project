@@ -50,7 +50,30 @@ Remediation
 Do not build a command from untrusted input. Prefer a fixed program path with arguments passed as separate values; if a shell string is unavoidable, escape the value for the command context (for example with the 'shell_escape' rule) and re-run the analysis to confirm the flow disappears.
 
 Source context
-1// expect: 1 finding, rule command_execution, HIGH, category command-injection2// Untrusted standard input is concatenated into a shell command.3string build_command(string user_input) {4  return "ls " + user_input;5}6 7int main() {8  string name = input();9  string command = build_command(name);10  system(command);11  return 0;12}
+1
+// expect: 1 finding, rule command_execution, HIGH, category command-injection
+2
+// Untrusted standard input is concatenated into a shell command.
+3
+string build_command(string user_input) {
+4
+  return "ls " + user_input;
+5
+}
+6
+ 
+7
+int main() {
+8
+  string name = input();
+9
+  string command = build_command(name);
+10
+  system(command);
+11
+  return 0;
+12
+}
 Show in Program Graph
 Security slice of this finding
 Evidence record (what justified each hop)
