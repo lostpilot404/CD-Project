@@ -68,7 +68,9 @@ root `/home/user/CD-Project`.
 > (`github.com/lostpilot404/CD-Project`), at the user's instruction, as one commit on top of
 > `9e3a54b`. `var/` was not committed (it is git-ignored), so the probes and evidence JSON named
 > throughout this file remain **ephemeral** — they are described here in enough detail to be
-> re-created, and the re-created detection harness is listed in §7.1. No history was rewritten.
+> re-created — the re-created detection harness is listed in §7.1 and its eleven mutation recipes
+> are recorded verbatim in §7.1a, which is the durable copy of the instrument itself. No history
+> was rewritten.
 >
 > A third re-check was run the same day to close §7.1: the detection procedure was **re-created**
 > (`reredetect_fixes.py`, 11/11 over the re-derivable mutations) and Chromium's accessibility tree
@@ -319,6 +321,72 @@ than simply "a copy".
 | `reconcile_d28_states.mjs` | **final pass** — D28/D29/D27: computed colours and WCAG contrast for every control in a state matrix (normal / hover / keyboard focus / disabled) × (light / dark), plus axe on the populated graph and slicing views in both themes; writes `evidence/reconcile_d28_states.json` |
 | `reconcile_dark_targets.mjs` | **final pass** — axe `color-contrast` node targets on all nine routes in the dark theme; writes `evidence/dark_contrast_targets.json` |
 | `reconcile_focus_ring.mjs` + `png_scan.py` | **final pass** — tabs to a control, screenshots a strip around it and decodes the PNG with the standard library only, because `outline-style: auto` means the painted ring cannot be read from computed styles; writes `evidence/focus_ring.json` and `evidence/focus-ring/*.png` |
+
+
+### 7.1a Mutation recipes for the re-created detection harness
+
+`var/hostile-audit/tools/reredetect_fixes.py` is **git-ignored and therefore ephemeral**, exactly
+as the original `reconcile_detection.py` was. So that the harness can be rebuilt **exactly** rather
+than approximately, its eleven mutations are recorded here.
+
+Format, and it matters: on a `find:` line the anchor text begins **immediately after the single
+space that follows the colon** — every further leading space is part of the anchor, because these
+are indented lines of Python, CSS or JavaScript. `\n` denotes a newline and `\\` a literal
+backslash. Each recipe is applied to a **disposable copy** (never the working tree): the anchor is
+matched literally and must occur exactly once, the `replace` text takes its place, and the named
+test must then fail; that same test must pass on an untouched copy.
+
+```
+D2  file: codetrace/frontend/lexer.py
+    find:     return "0" <= ch <= "9"
+    replace:     return ch.isdigit()
+    test (python): tests.test_audit_regressions.LexerSubsetTests.test_non_ascii_digit_is_outside_the_alphabet
+D3  file: codetrace/frontend/clr_parser.py
+    find:     return pos > 0 and stream[pos - 1].kind in TYPE_KEYWORDS
+    replace:     return False
+    test (python): tests.test_audit_regressions.UnsupportedConstructTests.test_pointer_declarator_is_counted_as_unsupported
+D5  file: codetrace/api/server.py
+    find:         match = re.fullmatch(r"/statements/([^/]+)", rest)\n        if match:\n            try:\n                sid = int(match.group(1))\n            except ValueError as exc:\n                raise ApiError(400, "invalid-parameter", "'sid' must be an integer") from exc
+    replace:         match = re.fullmatch(r"/statements/(\\d+)", rest)\n        if match:\n            sid = int(match.group(1))
+    test (python): tests.test_audit_regressions.ApiContractTests.test_a_non_integer_statement_id_is_a_400_invalid_parameter
+D6  file: codetrace/api/server.py
+    find:             limit_text = query.get("limit")\n            limit = 4000\n            if limit_text:\n                try:\n                    limit = int(limit_text)\n                except ValueError as exc:\n                    raise ApiError(400, "invalid-parameter", "'limit' must be an integer") from exc\n                if limit < 0:\n                    raise ApiError(400, "invalid-parameter", "'limit' must not be negative")\n            self._send_json(graph.to_json(kinds=kinds or None, limit=limit))
+    replace:             self._send_json(graph.to_json(kinds=kinds or None, limit=int(query.get("limit", 4000))))
+    test (python): tests.test_audit_regressions.ApiContractTests.test_a_non_integer_graph_limit_is_a_400_not_a_500
+D8  file: codetrace/api/server.py
+    find:         if isinstance(rules_text, str) and len(rules_text.encode("utf-8")) > MAX_SOURCE_BYTES:\n            # The documented rule-file limit (API.md sec.7) applies wherever a rule\n            # file is accepted; /api/analyze used to accept megabytes of rules\n            # while /api/rules/validate rejected the same text with 413.\n            raise ApiError(413, "rules-too-large", "the rule file exceeds the analysis limit")\n
+    replace: (delete the matched block)
+    test (python): tests.test_audit_regressions.ApiContractTests.test_an_oversized_rule_file_is_refused_by_analyze_as_well
+D25  file: codetrace/api/server.py
+    find:         if not isinstance(before_id, str) or not isinstance(after_id, str):\n            # ComparisonRequest (docs/API.md §6) types both as strings.  A truthy\n            # non-string used to reach RunStore.get, whose dict lookup raised\n            # "unhashable type" for a list/dict and surfaced as a 500.\n            raise ApiError(400, "invalid-parameter", "'before' and 'after' must be run id strings")\n
+    replace: (delete the matched block)
+    test (python): tests.test_audit_regressions.ApiContractTests.test_a_non_string_run_id_is_refused_by_the_comparison
+D26  file: codetrace/api/server.py
+    find:             if mode not in ("lalr", "slr", "canonical"):\n                # grammar.build_automaton raises GrammarError for an unknown mode,\n                # which is not an ApiError: the handler turned a bad query parameter\n                # into a 500.  docs/API.md §1 lists invalid-parser-mode under 400 and\n                # /api/analyze already answers exactly this way for parser_mode.\n                raise ApiError(400, "invalid-parser-mode",\n                               "mode must be one of lalr, slr, canonical")\n
+    replace: (delete the matched block)
+    test (python): tests.test_audit_regressions.ApiContractTests.test_an_unknown_grammar_mode_is_a_400_not_a_500
+D10  file: frontend/js/app.js
+    find:       const graphFunctions = (state.run && state.run.summary && state.run.summary.functions) || [];
+    replace:       const graphFunctions = (state.run.summary && state.run.summary.functions) || [];
+    test (node): opening Program Graph with no run shows an empty state and no error banner
+D27  file: frontend/js/graph.js
+    find:       'aria-label': `${node.kind} ${shortened}${subText}`,
+    replace:       'aria-label': `${node.label} (line ${node.line})`,
+    test (node): a graph node draws text that appears in its accessible name
+D28  file: frontend/css/app.css
+    find:   background: var(--accent);\n  filter: brightness(1.08);
+    replace:   filter: brightness(1.08);
+    test (node): a primary button keeps its accent background while hovered
+D29  file: frontend/css/app.css
+    find:   --accent-ink: #14171c;
+    replace:   --accent-ink: #ffffff;
+    test (python): tests.test_audit_regressions.ThemeContrastTests.test_text_on_a_themed_surface_passes_in_every_theme
+```
+
+The recipes above were checked to round-trip against the harness that produced the 11/11 result,
+so this block, not the vanished file, is the durable copy.
+
+Not covered (and never claimed further than the historical record): **D9, D11, D12, D16, D17**.
 
 ### 7.2 Evidence files that exist
 

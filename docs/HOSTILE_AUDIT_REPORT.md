@@ -696,7 +696,9 @@ sites could be re-derived exactly from the current source. Result: **11/11 detec
 controls passed, 0 skipped**, `evidence/reredetect_fixes.json`. The remaining five (D9, D11, D12,
 D16, D17 — all front-end state defects) are **not** re-created here: their mutation sites were not
 re-derived in this pass, so for those the detection evidence remains the historical record, and
-this document does not claim otherwise.
+this document does not claim otherwise. The eleven recipes are recorded verbatim in
+`docs/HOSTILE_AUDIT_EVIDENCE.md` §7.1a — the instrument no longer depends on the ephemeral
+`var/` copy surviving, because its exact contents are in the committed evidence document.
 
 Two findings from this exercise are worth stating plainly. First, the D3 mutation had to be
 applied to the *shared* predicate `_follows_type_keyword`: disabling just one of its two call

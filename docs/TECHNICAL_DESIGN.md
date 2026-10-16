@@ -57,12 +57,12 @@ itself. `python3 -m codetrace.api` is the whole deployment.
 | `frontend/tests/` | 5 | 2108 | stub DOM, harness, library tests, view tests against a real engine |
 | `evaluation/` | 2 | 754 | labelled corpus harness and `expectations.json` |
 | `scripts/` | 5 | 1485 | dev server, full test run, corpus evaluation, independent audit, mutation check |
-| `docs/` | 15 | 5380 | the documentation set (see `README.md`) |
+| `docs/` | 15 | 5452 | the documentation set (see `README.md`) |
 | `examples/` | 34 | 307 | 33 labelled `.ctc` sources and one example rule file |
 
 Total implementation: 12 766 lines of Python in `codetrace/` (39 files), 6 195
 lines of engine tests, 5 594 lines of frontend assets (of which 2 108 are the
-interface tests), 1 485lines of scripts and 5 380 lines of documentation.
+interface tests), 1 485lines of scripts and 5 452 lines of documentation.
 Counted with `wc -l`-style line counts, which include blank lines and comments.
 The table is **checked**: `python3 scripts/audit.py` re-derives every row from
 the tree and fails if a number here disagrees, so a stale row cannot survive a

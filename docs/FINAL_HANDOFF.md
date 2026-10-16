@@ -147,7 +147,9 @@ each fix in a disposable copy and requires the covering test to fail: **11/11 de
 controls passed** (D2, D3, D5, D6, D8, D10, D25, D26, D27, D28, D29); the remaining five front-end
 mutations (D9, D11, D12, D16, D17) rest on the historical record. The defect fixes themselves are
 in the source and their tests run. Probes for all of this live under `var/hostile-audit/tools/`,
-which is **git-ignored** — copy them out if they need to outlive the sandbox.
+which is **git-ignored** — but the harness no longer depends on them surviving: the eleven
+mutation recipes are recorded verbatim in `docs/HOSTILE_AUDIT_EVIDENCE.md` §7.1a (checked to
+round-trip against the harness byte for byte), so the detection run can be rebuilt exactly.
 
 ## 7. Commit and push status
 
