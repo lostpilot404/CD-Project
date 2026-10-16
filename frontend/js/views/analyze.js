@@ -113,7 +113,9 @@ export function renderAnalyze(container, { state, onRun, onStatus }) {
   const source = state.source || '';
 
   const editor = container.querySelector('#source-input');
-  if (editor.value !== source) editor.value = source;
+  // While `editorDirty` is set the editor holds text the user typed after the
+  // last submission; syncing it to the state would silently delete that edit.
+  if (!state.editorDirty && editor.value !== source) editor.value = source;
 
   const stored = container.querySelector('#filename-input');
   if (state.run && !stored.dataset.touched) stored.value = state.run.filename;
@@ -162,15 +164,34 @@ export function renderAnalyze(container, { state, onRun, onStatus }) {
 }
 
 /** Example picker: a modal dialog listing the bundled corpus. */
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
+
 export async function openExamplePicker({ onPick }) {
   const root = document.getElementById('modal-root');
   const list = el('div', {}, el('p', { class: 'spinner-wrapper' }, [el('span', { class: 'spinner' }), ' loading examples…']));
+  // A dialog that does not hold focus lets Tab walk into the page behind it, and
+  // without restoring focus the keyboard user is dropped at the top of the
+  // document when it closes.
+  const opener = typeof document.activeElement === 'object' ? document.activeElement : null;
   const close = () => {
     if (typeof document.removeEventListener === 'function') document.removeEventListener('keydown', onKey);
     render(root, []);
+    if (opener && typeof opener.focus === 'function' && document.contains(opener)) opener.focus();
   };
   const onKey = (event) => {
-    if (event.key === 'Escape') close();
+    if (event.key === 'Escape') { close(); return; }
+    if (event.key !== 'Tab') return;
+    const focusable = [...root.querySelectorAll(FOCUSABLE)].filter((node) => node.offsetParent !== null || node === document.activeElement);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && (document.activeElement === first || !root.contains(document.activeElement))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (document.activeElement === last || !root.contains(document.activeElement))) {
+      event.preventDefault();
+      first.focus();
+    }
   };
   document.addEventListener('keydown', onKey);
   const closeButton = el('button', { type: 'button', class: 'button button--small', text: 'Close', on: { click: close } });

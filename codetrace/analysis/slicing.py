@@ -211,6 +211,7 @@ class SliceEngine:
     def for_finding(self, finding) -> Slice:
         """Security slice: the sink's backward slice plus the source-to-sink path."""
         sink_sid = finding.sink.get("sid", -1)
+        sink_statement = self.program.statements.get(sink_sid)
         base = self.backward(sink_sid)
         path_statements = [step["sid"] for step in finding.path if step.get("sid", -1) >= 0]
         merged: List[int] = sorted(set(base.statements) | set(path_statements))
@@ -249,6 +250,9 @@ class SliceEngine:
                 "source": finding.source,
                 "sid": sink_sid,
                 "text": self.program.statement_text(sink_sid).strip(),
+                "line": sink_statement.line if sink_statement else 0,
+                "col": sink_statement.col if sink_statement else 0,
+                "function": self.program.function_of_statement(sink_sid),
             },
             statements=merged,
             reasons=reasons,

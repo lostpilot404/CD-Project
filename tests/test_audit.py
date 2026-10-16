@@ -103,6 +103,67 @@ class ModuleTableTests(unittest.TestCase):
         with open(self.path, "rb") as handle:
             self.assertEqual(handle.read(), original.encode("utf-8"))
 
+    def test_a_drifted_table_is_diagnosed_without_verbose(self):
+        """A failing check must show what it measured, with no -v and no guessing.
+
+        The default run is the one the suite and a reviewer execute.  When the module
+        table drifts, "the module table ... matches the tree" used to be printed alone:
+        no row, no measured value, no remedy -- which is how a deterministic drift was
+        mistaken for an intermittent failure.  The output must name the row that differs
+        and the command that refreshes the table.
+        """
+        with open(self.path, encoding="utf-8") as handle:
+            original = handle.read()
+        broken = re.sub(r"^\| `codetrace/analysis` \| (\d+) \| \d+ \|",
+                        lambda m: f"| `codetrace/analysis` | {m.group(1)} | 1 |",
+                        original, count=1, flags=re.M)
+        self.assertNotEqual(broken, original, "the test found the row to break")
+        try:
+            with open(self.path, "w", encoding="utf-8") as handle:
+                handle.write(broken)
+            result = subprocess.run(
+                [sys.executable, "scripts/audit.py"], cwd=ROOT,   # deliberately no -v
+                capture_output=True, text=True, timeout=900,
+            )
+            output = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, "a wrong line count must fail the audit")
+            self.assertIn("codetrace/analysis", output,
+                          "the failing check names the row that drifted")
+            self.assertIn("--write-module-table", output, "the failure names the remedy")
+        finally:
+            with open(self.path, "w", encoding="utf-8") as handle:
+                handle.write(original)
+
+
+    def test_a_stale_prose_total_is_noticed_without_verbose(self):
+        """The numbers in the paragraph under the table are checked too (gap N6).
+
+        They are duplicated facts maintained by hand: a green audit survived beside a
+        sentence that understated the documentation by 357 lines.  The comparison must
+        report the stale figure, in the default run, naming the prose field.
+        """
+        with open(self.path, encoding="utf-8") as handle:
+            original = handle.read()
+        stale = re.sub(r"(lines of Python in `codetrace/` \()(\d+)( files\))",
+                       lambda m: f"{m.group(1)}{int(m.group(2)) + 1}{m.group(3)}",
+                       original, count=1)
+        self.assertNotEqual(stale, original, "the test found the sentence to stale")
+        try:
+            with open(self.path, "w", encoding="utf-8") as handle:
+                handle.write(stale)
+            result = subprocess.run(
+                [sys.executable, "scripts/audit.py"], cwd=ROOT,   # deliberately no -v
+                capture_output=True, text=True, timeout=900,
+            )
+            output = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0, "a stale prose total must fail the audit")
+            self.assertIn("prose python_files", output, "the drift names the prose field")
+        finally:
+            with open(self.path, "w", encoding="utf-8") as handle:
+                handle.write(original)
+        with open(self.path, "rb") as handle:
+            self.assertEqual(handle.read(), original.encode("utf-8"))
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

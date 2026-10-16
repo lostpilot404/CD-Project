@@ -77,9 +77,15 @@ export function renderSlicing(container, { state, onCriterion, onDirection, onSe
       el('td', { text: (slice.reasons[String(statement.sid)] || []).join(' · ') }),
     ]));
 
+  // A statement criterion carries a line number; a security slice describes a
+  // finding.  Printing "line undefined" when it does not was a visible falsehood.
+  const criterion = slice.criterion || {};
+  const criterionText = criterion.text
+    ? (Number.isFinite(criterion.line) ? `line ${criterion.line}: ${criterion.text}` : criterion.text)
+    : JSON.stringify(criterion);
   const facts = [
     el('dt', { text: 'criterion' }),
-    el('dd', { text: slice.criterion.text ? `line ${slice.criterion.line}: ${slice.criterion.text}` : JSON.stringify(slice.criterion) }),
+    el('dd', { text: criterionText }),
   ];
   if (slice.finding_id) {
     facts.push(el('dt', { text: 'finding' }), el('dd', { class: 'mono', text: slice.finding_id }));

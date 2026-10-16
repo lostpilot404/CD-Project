@@ -26,7 +26,7 @@ from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tupl
 
 from .grammar import END, Automaton, Grammar, GrammarError, Item, build_automaton
 from .lexer import Diagnostic
-from .tokens import EOF, INVALID, Token, display_kind
+from .tokens import EOF, INVALID, STAR, Token, display_kind
 
 SHIFT = "shift"
 REDUCE = "reduce"
@@ -315,6 +315,18 @@ class ParseResult:
 _SYNC_TOKENS = {"SEMI", "RBRACE"}
 
 
+TYPE_KEYWORDS = frozenset({"KW_INT", "KW_FLOAT", "KW_CHAR", "KW_BOOL", "KW_STRING"})
+
+
+def _follows_type_keyword(stream, pos: int) -> bool:
+    """True when the token at ``pos`` directly follows a type keyword.
+
+    Used to tell a pointer declarator (``int *p;`` -- an unsupported construct
+    per docs/LANGUAGE.md §4) from a plain syntax error such as ``1 + * 2``.
+    """
+    return pos > 0 and stream[pos - 1].kind in TYPE_KEYWORDS
+
+
 class LRParser:
     """Deterministic LR parser driving the tables built above."""
 
@@ -538,6 +550,17 @@ class LRParser:
         elif token.kind == EOF:
             code, message = "SYN001", "unexpected end of file"
             detail = "the input ended while the parser expected more tokens"
+        elif token.kind == STAR and _follows_type_keyword(stream, pos):
+            # ``int *p;``: ``*`` is legal in CT-C (multiplication), so this is only
+            # recognisable from its position -- directly after a type keyword, where
+            # the grammar requires IDENT.  docs/LANGUAGE.md §4 lists pointers as an
+            # unsupported construct that is *counted*; before this, `int *p;` produced
+            # a bare syntax error and summary.unsupported_constructs stayed 0.
+            code, message = "SYN001", "unsupported construct: pointer declarator ('*')"
+            detail = (
+                "pointer types ('*p') are outside the analysed subset; the enclosing statement "
+                "was skipped and marked as unanalysed"
+            )
         else:
             code, message = "SYN001", f"unexpected {token.display()}"
             detail = f"the parser expected one of: {expected_txt}"
@@ -553,7 +576,10 @@ class LRParser:
                 end_offset=token.end_offset,
                 phase="parser",
                 detail=detail,
-                unsupported=(token.kind == "UNSUPPORTED_KW"),
+                unsupported=(
+                    token.kind == "UNSUPPORTED_KW"
+                    or (token.kind == STAR and _follows_type_keyword(stream, pos))
+                ),
             )
         )
 

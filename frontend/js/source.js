@@ -54,7 +54,14 @@ export function renderSource(source, options = {}) {
     body.appendChild(row);
   });
 
-  return el('div', { class: 'source' }, body);
+  // The pane scrolls; without a tab stop a keyboard user cannot reach the
+  // content inside it (axe: scrollable-region-focusable).
+  return el('div', {
+    class: 'source',
+    tabindex: '0',
+    role: 'group',
+    'aria-label': 'Source of the analysed file',
+  }, body);
 }
 
 /** Map of line number -> highest severity, for the gutter markers. */

@@ -39,7 +39,14 @@ export function renderRules(container, { state, onStatus }) {
     render(diagnostics, []);
     return container;
   }
+  const editorNode = container.querySelector('#rule-editor');
+  const stale = Boolean(editorNode) && state.rulesValidatedText !== undefined
+    && editorNode.value !== state.rulesValidatedText;
   render(diagnostics, [
+    stale
+      ? el('p', { class: 'alert alert--info' },
+          'The editor has changed since this validation. The result below describes the text that was validated, not the current contents of the editor — validate again to check the new text.')
+      : null,
     el('h2', { text: 'Validation result' }),
     el('p', { text: state.rulesValidated.valid ? 'The rule set is valid and can be used for an analysis.' : 'The rule set was rejected; it is not used for any analysis.' }),
     state.rulesValidated.diagnostics.length
@@ -63,8 +70,8 @@ export function renderRules(container, { state, onStatus }) {
   return container;
 }
 
-export async function validateRules(text) {
+export async function validateRules(text, validatedText = text) {
   const result = await api.validateRules(text);
-  update({ rulesValidated: result });
+  update({ rulesValidated: result, rulesValidatedText: validatedText });
   return result;
 }

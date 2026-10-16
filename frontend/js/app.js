@@ -41,6 +41,10 @@ function showError(message, detail = '') {
 
 function showRoute() {
   const route = currentRoute();
+  // The global banner reports a failure of the view that was rendering when it
+  // happened.  Carrying it to the next route claimed a failure that this route
+  // never had.
+  showError('');
   for (const name of ROUTES) {
     document.getElementById(`view-${name}`).hidden = name !== route;
   }
@@ -130,7 +134,7 @@ async function refresh(route = currentRoute()) {
       // fetch it the first time the page is opened and paint again.  A failed
       // fetch is kept on the state (not only in the banner) so the canvas can
       // explain itself instead of spinning forever.
-      const graphFunctions = (state.run.summary && state.run.summary.functions) || [];
+      const graphFunctions = (state.run && state.run.summary && state.run.summary.functions) || [];
       const needsFetch = state.run && !state.graph.data && !state.graph.loadError
         && (state.graph.mode === 'cfg'
           ? graphFunctions.length > 0
@@ -278,9 +282,13 @@ async function selectFinding(findingId) {
   refresh('findings');
   try {
     const detail = await loadFindingDetail(state.run.run_id, findingId);
+    // A slow response for a previously selected finding must not be painted as
+    // the detail of the finding that is selected now.
+    if (state.selectedFinding !== findingId) return;
     update({ selectedFindingDetail: detail });
     refresh('findings');
   } catch (error) {
+    if (state.selectedFinding !== findingId) return;
     showError(`Could not load the finding: ${error.message}`);
   }
 }
@@ -290,8 +298,10 @@ async function selectStatement(sid) {
   update({ selectedStatement: sid });
   try {
     const detail = await api.statement(state.run.run_id, sid);
+    if (state.selectedStatement !== sid) return;   // a newer selection won
     update({ statementDetail: detail, selectedStatement: sid });
   } catch (error) {
+    if (state.selectedStatement !== sid) return;
     showError(`Could not load statement ${sid}: ${error.message}`);
   }
   const route = currentRoute();
@@ -334,19 +344,43 @@ function wireInputs() {
   filename.addEventListener('input', () => { filename.dataset.touched = 'true'; });
 
   view.querySelector('#analyze-button').addEventListener('click', async () => {
+    const submitted = editor.value;
+    update({ editorDirty: false });
+    // A response that was in flight when the user cleared the page must not
+    // repopulate it with results for text that is no longer there.
+    const resetAtSubmit = state.resetCounter;
     const run = await runAnalysis(view, {
       filename: filename.value || 'example.ctc',
-      source: editor.value,
+      source: submitted,
       parserMode: view.querySelector('#parser-mode').value,
       useBuiltin: view.querySelector('#use-builtin').checked,
       customRules: customRules.value,
       runDependencies: view.querySelector('#run-dependencies').checked,
     });
+    if (run && state.resetCounter !== resetAtSubmit) {
+      // The user cleared the page (or reset it) while this request was in
+      // flight: drop the result instead of resurrecting a run they discarded.
+      resetRun();
+      refresh('analyze');
+      return;
+    }
     if (run) {
       // runAnalysis already stored the run and dropped the previous run's
       // artefacts; only the statement index (derived here) is still missing.
       update({ statementsById: statementIndex(run) });
+      // Everything typed while the request was in flight is newer than the run.
+      // Overwriting it silently destroyed the user's edit and left the page
+      // claiming that the displayed results described the visible text.
+      const dirty = editor.value !== submitted;
+      update({ editorDirty: dirty });
       refresh('analyze');
+      if (dirty) {
+        const status = view.querySelector('#analyze-status');
+        render(status, el('span', {
+          class: 'alert alert--info',
+          text: 'The results below are for the text that was submitted. The editor has been changed since then — run the analysis again to analyse the current text.',
+        }));
+      }
     }
   });
 
@@ -374,7 +408,7 @@ function wireInputs() {
     const status = document.getElementById('rules-status');
     render(status, [el('span', { class: 'spinner' }), ' validating…']);
     try {
-      const result = await validateRules(rules.value);
+      const result = await validateRules(rules.value, rules.value);
       render(status, el('span', {
         class: result.valid ? 'status' : 'alert alert--error',
         text: result.valid
@@ -387,10 +421,19 @@ function wireInputs() {
     refresh('rules');
   });
 
+  // The status line describes the text that was validated.  Once the editor
+  // changes it is stale, and saying nothing about that let a validation result
+  // stand for text that was never validated.
+  rules.addEventListener('input', () => {
+    update({ ruleEditorTouched: true });
+    refresh('rules');
+  });
+
   document.getElementById('load-rule-example-button').addEventListener('click', async () => {
     try {
       const example = await api.example('custom_rules/strict_rules.ctrule');
       rules.value = example.content;
+      update({ ruleEditorTouched: true });
       const status = document.getElementById('rules-status');
       render(status, [el('span', { text: 'Loaded the example rule file. Validate it, then use it from the Analyze Code page.' })]);
     } catch (error) {
@@ -415,11 +458,99 @@ function wireInputs() {
     })]);
   });
 
-  document.getElementById('theme-toggle').addEventListener('click', (event) => {
-    const on = document.body.classList.toggle('contrast');
-    event.target.textContent = `High contrast: ${on ? 'on' : 'off'}`;
-    event.target.setAttribute('aria-pressed', String(on));
-  });
+  wireTheme();
+}
+
+/* ------------------------------------------------------------------------
+ * Theme
+ *
+ * docs/USER_GUIDE.md §6 promises that the theme toggle switches light/dark and
+ * remembers the preference.  The button used to toggle a high-contrast body
+ * class and nothing else: no persistence, and the operating-system preference
+ * was ignored.  Three states (light / dark / system) are stored in localStorage,
+ * `system` follows `prefers-color-scheme` live, and the high-contrast switch is
+ * kept as its own control.
+ * ---------------------------------------------------------------------- */
+const THEME_KEY = 'codetrace.theme';
+const CONTRAST_KEY = 'codetrace.contrast';
+const THEMES = ['light', 'dark', 'system'];
+
+function storedTheme() {
+  try {
+    const value = window.localStorage.getItem(THEME_KEY);
+    return THEMES.includes(value) ? value : 'system';
+  } catch (error) {
+    return 'system';   // storage can be unavailable (private mode)
+  }
+}
+
+function systemPrefersDark() {
+  return Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+
+function applyTheme(theme) {
+  const dark = theme === 'dark' || (theme === 'system' && systemPrefersDark());
+  // add/remove rather than `toggle(cls, force)`: the optional force argument is
+  // not implemented by the test DOM, and relying on it made the theme untestable.
+  if (dark) document.body.classList.add('dark');
+  else document.body.classList.remove('dark');
+  document.body.dataset.theme = theme;
+  const button = document.getElementById('theme-toggle');
+  if (button) {
+    button.textContent = `Theme: ${theme}`;
+    button.setAttribute('aria-label', `Colour theme: ${theme}. Activate to switch to the next theme.`);
+    button.dataset.theme = theme;
+  }
+}
+
+/** The theme in force.  Kept in memory as well as in storage: with storage
+ *  unavailable (private mode, storage disabled) the control must still cycle. */
+let currentTheme = null;
+
+function setTheme(theme, { persist = true } = {}) {
+  if (persist) {
+    try { window.localStorage.setItem(THEME_KEY, theme); } catch (error) { /* ignore */ }
+  }
+  currentTheme = theme;
+  applyTheme(theme);
+}
+
+function activeTheme() {
+  return currentTheme || storedTheme();
+}
+
+function wireTheme() {
+  const button = document.getElementById('theme-toggle');
+  setTheme(storedTheme(), { persist: false });
+  if (button) {
+    button.addEventListener('click', () => {
+      const next = THEMES[(THEMES.indexOf(activeTheme()) + 1) % THEMES.length];
+      setTheme(next);
+    });
+  }
+  if (window.matchMedia) {
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => { if (activeTheme() === 'system') applyTheme('system'); };
+    if (query.addEventListener) query.addEventListener('change', onChange);
+    else if (query.addListener) query.addListener(onChange);
+  }
+  const contrast = document.getElementById('contrast-toggle');
+  if (contrast) {
+    let on = false;
+    try { on = window.localStorage.getItem(CONTRAST_KEY) === 'on'; } catch (error) { on = false; }
+    const paint = () => {
+      if (on) document.body.classList.add('contrast');
+      else document.body.classList.remove('contrast');
+      contrast.setAttribute('aria-pressed', String(on));
+      contrast.textContent = `High contrast: ${on ? 'on' : 'off'}`;
+    };
+    contrast.addEventListener('click', () => {
+      on = !on;
+      try { window.localStorage.setItem(CONTRAST_KEY, on ? 'on' : 'off'); } catch (error) { /* ignore */ }
+      paint();
+    });
+    paint();
+  }
 }
 
 async function boot() {

@@ -37,7 +37,10 @@
         <li><a href="#/documentation" data-route="documentation">Documentation</a></li>
       </ul>
       <div class="nav__footer">
-        <button type="button" class="button button--ghost button--small" id="theme-toggle" aria-pressed="false">
+        <button type="button" class="button button--ghost button--small" id="theme-toggle" aria-label="Colour theme: system. Activate to switch to the next theme.">
+          Theme: system
+        </button>
+        <button type="button" class="button button--ghost button--small" id="contrast-toggle" aria-pressed="false">
           High contrast: off
         </button>
         <p class="nav__note">
@@ -129,7 +132,7 @@
         <div class="panel panel--toolbar" id="graph-toolbar"></div>
         <div class="graph-layout">
           <div class="graph-layout__canvas" id="graph-canvas"></div>
-          <aside class="graph-layout__side" id="graph-side"></aside>
+          <div class="graph-layout__side" id="graph-side"></div>
         </div>
       </section>
 
