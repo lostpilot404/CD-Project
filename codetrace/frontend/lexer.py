@@ -121,6 +121,29 @@ class LexResult:
         return not any(d.severity == "error" for d in self.diagnostics)
 
 
+def _is_ident_start(ch: str) -> bool:
+    """``[A-Za-z_]`` -- the identifier alphabet of CT-C subset v1.
+
+    ``str.isalpha()`` is not used on purpose: it also accepts non-ASCII letters,
+    which are outside the documented alphabet and must raise ``LEX008``.
+    """
+    return ch == "_" or ("a" <= ch <= "z") or ("A" <= ch <= "Z")
+
+
+def _is_ident_continue(ch: str) -> bool:
+    """``[A-Za-z0-9_]``."""
+    return _is_ident_start(ch) or _is_digit(ch)
+
+
+def _is_digit(ch: str) -> bool:
+    """``[0-9]`` -- literals are ASCII in CT-C subset v1 (docs/LANGUAGE.md §1).
+
+    The Unicode-aware ``str.isdigit`` accepts other digit sets (U+0660, U+0663),
+    which ``int()`` then converts, so ``int a = <U+0660>;`` analysed as ``0``.
+    """
+    return "0" <= ch <= "9"
+
+
 class Lexer:
     """Longest-match lexer.
 
@@ -274,8 +297,8 @@ class Lexer:
                 continue
             start, start_line, start_col = self.pos, self.line, self.col
             # Identifiers and keywords -----------------------------------
-            if ch.isalpha() or ch == "_":
-                while self.pos < len(src) and (src[self.pos].isalnum() or src[self.pos] == "_"):
+            if _is_ident_start(ch):
+                while self.pos < len(src) and _is_ident_continue(src[self.pos]):
                     self._advance()
                 word = src[start : self.pos]
                 if word in self.keywords:
@@ -297,7 +320,7 @@ class Lexer:
                     tokens.append(self._make_token(IDENT, start, start_line, start_col, word))
                 continue
             # Numbers -----------------------------------------------------
-            if ch.isdigit():
+            if _is_digit(ch):
                 tokens.append(self._number(start, start_line, start_col))
                 continue
             # String literal ----------------------------------------------
@@ -387,7 +410,7 @@ class Lexer:
         if src[start] == "0" and self._peek(1) in ("x", "X"):
             self._advance(2)
             digits = 0
-            while self.pos < len(src) and (src[self.pos].isdigit() or src[self.pos].lower() in "abcdef_"):
+            while self.pos < len(src) and (_is_digit(src[self.pos]) or src[self.pos].lower() in "abcdef_"):
                 if src[self.pos] != "_":
                     digits += 1
                 self._advance()
@@ -397,23 +420,23 @@ class Lexer:
             text = src[start : self.pos].replace("_", "")
             return self._make_token(INT_LIT, start, start_line, start_col, int(text, 16))
 
-        while self.pos < len(src) and (src[self.pos].isdigit() or src[self.pos] == "_"):
+        while self.pos < len(src) and (_is_digit(src[self.pos]) or src[self.pos] == "_"):
             self._advance()
-        if self.pos < len(src) and src[self.pos] == "." and self._peek(1).isdigit():
+        if self.pos < len(src) and src[self.pos] == "." and _is_digit(self._peek(1)):
             is_float = True
             self._advance()
-            while self.pos < len(src) and (src[self.pos].isdigit() or src[self.pos] == "_"):
+            while self.pos < len(src) and (_is_digit(src[self.pos]) or src[self.pos] == "_"):
                 self._advance()
         if self.pos < len(src) and src[self.pos] in "eE":
             nxt = self._peek(1)
-            if nxt.isdigit() or (nxt in "+-" and self._peek(2).isdigit()):
+            if _is_digit(nxt) or (nxt in "+-" and _is_digit(self._peek(2))):
                 is_float = True
                 self._advance()
                 if src[self.pos] in "+-":
                     self._advance()
-                while self.pos < len(src) and src[self.pos].isdigit():
+                while self.pos < len(src) and _is_digit(src[self.pos]):
                     self._advance()
-        if self.pos < len(src) and (src[self.pos].isalpha() or src[self.pos] == "_"):
+        if self.pos < len(src) and _is_ident_start(src[self.pos]):
             # e.g. ``12abc`` -- trailing identifier characters are suspicious.
             self._error(
                 "LEX004",
@@ -566,7 +589,7 @@ class Lexer:
         ("||", OROR),
         ("<<", INVALID),
         (">>", INVALID),
-        ("->", ARROW),
+        ("->", INVALID),
         ("(", LPAREN),
         (")", RPAREN),
         ("{", LBRACE),
@@ -585,12 +608,14 @@ class Lexer:
         ("<", LT),
         (">", GT),
         ("!", NOT),
-        ("&", AMP),
+        ("&", INVALID),
     )
 
     #: Operators that are valid C but unsupported here; a dedicated message
     #: beats "invalid character".
     _UNSUPPORTED_OPS: dict[str, str] = {
+        "->": "pointer member access ('->') is outside the supported subset",
+        "&": "the address-of / bitwise-and operator ('&') is outside the supported subset",
         "<<": "bitwise shift operators are outside the supported subset",
         ">>": "bitwise shift operators are outside the supported subset",
         "<<=": "bitwise shift-assign operators are outside the supported subset",

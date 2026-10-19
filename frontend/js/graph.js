@@ -88,7 +88,10 @@ function buildSvg(nodes, edges, options) {
     // graphs into an unreadable strip.
     width: width,
     height: Math.max(240, height),
-    role: 'img',
+    // Not role="img": the nodes inside are focusable buttons, and a role that
+    // makes the subtree presentational while it stays interactive is an
+    // accessibility error (axe: nested-interactive).
+    role: 'group',
     'aria-label': `Program graph with ${nodes.length} nodes and ${drawn.length} edges`,
   });
   const defs = svg('defs');
@@ -122,19 +125,30 @@ function buildSvg(nodes, edges, options) {
   for (const node of nodes) {
     const position = positions.get(node.id);
     if (!position) continue;
+    // The accessible name is built from the *same* two strings the node draws:
+    // axe's label-content-name-mismatch (WCAG 2.5.3 Label in Name) requires the
+    // visible text to appear in the accessible name, and building the name from the
+    // untruncated label plus "(line N)" made the drawn text -- the shortened label
+    // followed by "line N" -- fail to appear in it.
+    const shortened = shortenLabel(node.label, 26);
+    const subText = `line ${node.line}${node.symbol ? ` · ${node.symbol}` : ''}`;
     const group = svg('g', {
       class: `node node--${node.kind}${options.selectedId === node.id ? ' node--selected' : ''}`,
       tabindex: '0',
       role: 'button',
-      'aria-label': `${node.kind} ${node.label} (line ${node.line})`,
+      // The drawn text is the concatenation of the two <text> nodes and axe compares
+      // that concatenation against the accessible name verbatim (WCAG 2.5.3), so the
+      // name repeats it exactly after the kind: "<kind> <drawn text>".  The kind stays
+      // first because the graph's own tests and the side panel select nodes by it.
+      'aria-label': `${node.kind} ${shortened}${subText}`,
       transform: `translate(${position.x}, ${position.y})`,
     });
     group.appendChild(svg('rect', { width: position.width, height: position.height, rx: '6' }));
     const label = svg('text', { x: '8', y: '14' });
-    label.textContent = shortenLabel(node.label, 26);
+    label.textContent = shortened;
     group.appendChild(label);
     const sub = svg('text', { x: '8', y: '27', class: 'node__sub' });
-    sub.textContent = `line ${node.line}${node.symbol ? ` · ${node.symbol}` : ''}`;
+    sub.textContent = subText;
     group.appendChild(sub);
     const select = () => options.onSelect && options.onSelect(node);
     group.addEventListener('click', select);

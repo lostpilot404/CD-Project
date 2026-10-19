@@ -770,18 +770,28 @@ instead of trusting it.
 * **Data edges** come from the reaching definitions of §13: for each statement
   reading `v`, `d(v) → read` for every definition of `v` in `IN`.
 * **Define edges** connect a statement to the definition it creates.
-* **Control edges** connect a statement to the condition of the nearest
-  enclosing `if`/`while`/`for`. With no `goto` in the language, this syntactic
-  nesting relation *is* the control-dependence relation of the CFG, which is why
-  the implementation can compute it from the AST and still be exact
+* **Control edges** connect a statement to the condition of *every* enclosing
+  `if`/`while`/`for` that must hold for it to execute -- the transitive closure
+  of the nesting relation, not only the innermost guard: in
+  `if (a) { while (b) { f(); } }` the call is control dependent on both `a` and
+  `b`, and a slice that kept only the nearest guard would be non-executable.
+  The `for` header is one statement carrying the guard, so its init and update
+  parts are not control dependent on the loop condition while the body is. With
+  no `goto` in the language, this syntactic nesting relation *is* the
+  control-dependence relation of the CFG, which is why the implementation can
+  compute it from the AST and still be exact
   (`dependencies.control_dependencies`).
 * **Call and return-value edges** connect a call statement with the callee's
   entry/return statements; **taint** edges carry the atoms that travel, and
   **source-to-sink** edges mark the reported flows.
 
-`DependencyGraph.to_json(kinds=…)` filters by kind, caps the payload
-(`limit=4000`, `truncated` flag) and never emits an edge whose endpoints are not
-in the payload.
+`DependencyGraph.to_json(kinds=…)` matches each requested name against the edge
+`kind` **or** its `family` -- asking for `data` returns the taint-carrying data
+edges as well, because a `taint` edge is a `data` edge plus an atom
+(`DepEdge.family`), and `taint` selects only the untrusted-flow edges. It caps
+the payload (`limit=4000`, `truncated` flag) and never emits an edge whose
+endpoints are not in the payload; an unrecognised kind name selects nothing and
+yields an empty payload rather than an error.
 
 **Worked example.** `scripts/audit.py` re-verifies, for every intra-procedural
 data/taint edge, that the source definition is in the target statement's IN set

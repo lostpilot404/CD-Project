@@ -59,6 +59,19 @@ VERBOSE = False
 FAILURES: list = []
 CHECKS = 0
 
+#: The prose paragraph under the module table restates the same measurements.  The audit
+#: recorded this duplication as gap N6 (the numbers were hand-maintained and unchecked);
+#: during the reconciliation they went stale -- "4 487 lines of documentation" survived a
+#: green audit while the table beside it said 4 844 -- so the comparison now covers them.
+#: The numbers are matched in place, so a refresh cannot reflow the paragraph.
+PROSE_TOTALS = re.compile(
+    r"Total implementation:\s*(?P<python_lines>[\d ]+)\s+lines of Python in `codetrace/`\s*"
+    r"\((?P<python_files>\d+)\s+files\),\s*(?P<engine_test_lines>[\d ]+)\s+lines of engine tests,\s*"
+    r"(?P<frontend_asset_lines>[\d ]+)\s+lines of frontend assets \(of which\s*"
+    r"(?P<interface_test_lines>[\d ]+)\s+are the\s+interface tests\),\s*(?P<script_lines>[\d ]+)\s*"
+    r"lines of scripts and\s*(?P<documentation_lines>[\d ]+)\s+lines of documentation\."
+)
+
 #: Filled in by ``check_claims`` so ``--write-module-table`` refreshes the table
 #: from the same measurement the check uses, rather than from a second
 #: implementation that could disagree with it.
@@ -76,7 +89,10 @@ def check(name: str, condition: bool, observed: object = "") -> None:
     status = "PASS" if condition else "FAIL"
     if not condition:
         FAILURES.append(name)
-    detail = f"  -> {observed}" if VERBOSE and observed != "" else ""
+    # A failing check always shows what it observed: the default (non-verbose) run is
+    # the one the test suite and a reviewer execute, and a bare "[FAIL] name" with no
+    # measured value turned a deterministic drift into an apparent flake.
+    detail = f"  -> {observed}" if observed != "" and (VERBOSE or not condition) else ""
     if not SILENT:
         print(f"[{status}] {name}{detail}")
 
@@ -765,6 +781,38 @@ def check_claims() -> None:
             drift.append(f"{name}: missing from the table")
         elif actual != expected:
             drift.append(f"{name}: table says {actual}, tree has {expected}")
+    # The prose paragraph below the table states the same measurements in words.  It is
+    # checked here rather than as a separate check so that the documented count of
+    # independent checks (README.md, docs/FINAL_REPORT.md) stays accurate.
+    def prose_totals() -> dict:
+        python_rows = ("codetrace/frontend", "codetrace/semantics", "codetrace/analysis",
+                       "codetrace/rules", "codetrace/findings", "codetrace/reporting",
+                       "codetrace/api", "codetrace/*.py")
+        return {
+            "python_lines": sum(measured[name][1] for name in python_rows),
+            "python_files": sum(measured[name][0] for name in python_rows),
+            "engine_test_lines": measured["tests/"][1],
+            "frontend_asset_lines": measured["frontend/"][1] + measured["frontend/tests/"][1],
+            "interface_test_lines": measured["frontend/tests/"][1],
+            "script_lines": measured["scripts/"][1],
+            "documentation_lines": measured["docs/"][1],
+        }
+
+    totals = prose_totals()
+    match = PROSE_TOTALS.search(table_text)
+    if match is None:
+        drift.append("prose: the 'Total implementation:' sentence was not found")
+    else:
+        for key, value in totals.items():
+            stated = int(re.sub(r"\D", "", match.group(key)))
+            if stated != value:
+                drift.append(f"prose {key}: says {stated}, tree has {value}")
+
+    if drift:
+        # The table and the paragraph are generated.  Without the remedy the failure reads
+        # as "something changed"; with it, the reader knows the tree is fine and the
+        # derived numbers are stale.
+        drift = drift + ["refresh with: python3 scripts/audit.py --write-module-table"]
     check(
         "the module table in docs/TECHNICAL_DESIGN.md matches the tree",
         not drift,
@@ -856,6 +904,7 @@ def write_module_table() -> int:
         SILENT = False
     del FAILURES[before:]  # the measuring pass must not leave failures behind
     measured = dict(_MEASURED_MODULES)
+    row_counts = dict(measured)          # kept intact for the prose refresh below
     path = os.path.join(ROOT, MODULE_TABLE_PATH)
     with open(path, encoding="utf-8") as handle:
         lines = handle.readlines()
@@ -875,8 +924,42 @@ def write_module_table() -> int:
         lines[index] = replacement
     if measured:
         print("no row in the table for: " + ", ".join(sorted(measured)))
+    # The prose paragraph under the table is refreshed by the same command: it carries the
+    # same measurements, and a stale sentence is exactly the drift the check reports.
+    text = "".join(lines)
+    prose_match = PROSE_TOTALS.search(text)
+    python_rows = ("codetrace/frontend", "codetrace/semantics", "codetrace/analysis",
+                   "codetrace/rules", "codetrace/findings", "codetrace/reporting",
+                   "codetrace/api", "codetrace/*.py")
+    totals = {
+        "python_lines": sum(row_counts[name][1] for name in python_rows),
+        "python_files": sum(row_counts[name][0] for name in python_rows),
+        "engine_test_lines": row_counts["tests/"][1],
+        "frontend_asset_lines": row_counts["frontend/"][1] + row_counts["frontend/tests/"][1],
+        "interface_test_lines": row_counts["frontend/tests/"][1],
+        "script_lines": row_counts["scripts/"][1],
+        "documentation_lines": row_counts["docs/"][1],
+    }
+    if prose_match is None:
+        print("no 'Total implementation:' sentence to refresh")
+    else:
+        pieces = []
+        cursor = 0
+        for key in totals:                       # group order == text order
+            start, end = prose_match.span(key)
+            pieces.append(text[cursor:start])
+            pieces.append(f"{totals[key]:,}".replace(",", " "))
+            cursor = end
+        pieces.append(text[cursor:])
+        refreshed = "".join(pieces)
+        if refreshed != text:
+            for key in totals:
+                stated = int(re.sub(r"\D", "", prose_match.group(key)))
+                if stated != totals[key]:
+                    changed.append(f"prose {key}: {stated} -> {totals[key]}")
+            text = refreshed
     with open(path, "w", encoding="utf-8") as handle:
-        handle.writelines(lines)
+        handle.write(text)
     if changed:
         print("module table updated:")
         for entry in changed:
