@@ -99,6 +99,7 @@ docs/                  the documentation set (below)
 | `docs/EVALUATION.md` | how the labelled corpus was built and what the measured numbers mean |
 | `docs/PRESENTATION.md` | talk outline, demo script and viva questions |
 | `docs/FINAL_REPORT.md` | the completion report: what was built, the evidence for each claim, and what is not done |
+| `docs/CodeTrace_Project_Report.pdf` | the submission report for BCSE307P, generated from `docs/CodeTrace_Project_Report.md` by `scripts/build_project_report.py` |
 
 The Documentation page inside the application serves the same facts from the
 engine itself (language mode, grammar statistics, diagnostic catalogue, rule
