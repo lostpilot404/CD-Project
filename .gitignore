@@ -1,4 +1,13 @@
-# CodeTrace ignores
+# Local operating-system and editor files
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Python environments and caches
 __pycache__/
 *.py[cod]
 .venv/

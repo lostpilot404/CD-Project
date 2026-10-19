@@ -30,8 +30,9 @@ Then open `http://localhost:8000`, go to **Analyze Code**, press
 *Load example…*, pick `vulnerable/command_injection.ctc` and press *Run
 analysis*. Start with `docs/USER_GUIDE.md` if you want the guided tour.
 
-No third-party package is needed anywhere in the pipeline: there is no
-`requirements.txt` because there are no requirements beyond Python 3.11.
+No third-party package is needed to run the application or its analysis pipeline:
+Python 3.11+ is enough. Node.js 18+ and npm are needed only for the frontend tests.
+The optional PDF report builder has a separate build-time dependency (see below).
 
 ```bash
 scripts/tests.sh                 # every suite: engine, API, reporting, workflow, interface
@@ -79,7 +80,7 @@ tests/                 engine suite: lexer, parser, semantics, CFG, data-flow,
                        taint, slicing, rules, API, reporting, end-to-end workflow
 examples/              33 labelled `.ctc` files and one example rule file
 evaluation/            harness + `expectations.json` labels for the corpus
-scripts/               serve.sh, tests.sh, evaluate.sh, audit.py, mutation_check.py
+scripts/               server, test, evaluation, audit, mutation and report-building tools
 docs/                  the documentation set (below)
 ```
 
@@ -98,19 +99,35 @@ docs/                  the documentation set (below)
 | `docs/LIMITATIONS.md` | what the analysis does not do, per finding, and the threat model of the tool itself |
 | `docs/EVALUATION.md` | how the labelled corpus was built and what the measured numbers mean |
 | `docs/PRESENTATION.md` | talk outline, demo script and viva questions |
-| `docs/FINAL_REPORT.md` | the completion report: what was built, the evidence for each claim, and what is not done |
-| `docs/CodeTrace_Project_Report.pdf` | the submission report for BCSE307P, generated from `docs/CodeTrace_Project_Report.md` by `scripts/build_project_report.py` |
+| `docs/CodeTrace_Project_Report.md` | editable source of the project report, including verification evidence |
+| `docs/CodeTrace_Project_Report.pdf` | the finished BCSE307P project report |
 
 The Documentation page inside the application serves the same facts from the
 engine itself (language mode, grammar statistics, diagnostic catalogue, rule
 language), so the interface cannot claim more than the engine implements.
 
+### Rebuild the project report (optional)
+
+The finished PDF, its Markdown source and `scripts/build_project_report.py`
+are kept together as the current project deliverable. Only rebuilding the PDF
+needs ReportLab; running the application and its tests does not.
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install reportlab==5.0.1
+.venv/bin/python scripts/build_project_report.py --check
+```
+
+Keep generated analysis reports, evaluation JSON, screenshots, logs and scratch
+probes under the ignored `var/` directory. The project-report PDF in `docs/`
+is the intentional exception; local environments and caches are also ignored.
+
 ## Verification
 
 | Suite | Command | Result on this checkout |
 | --- | --- | --- |
-| Engine, API, reporting, workflow | `python3 -m unittest discover -s tests -t .` | 310 tests, all passing |
-| Interface | `cd frontend && npm test` | 39 tests, all passing (real engine over HTTP, stub DOM) |
+| Engine, API, reporting, workflow | `python3 -m unittest discover -s tests -t .` | 350 tests, all passing |
+| Interface | `cd frontend && npm test` | 53 tests, all passing (real engine over HTTP, stub DOM) |
 | Labelled corpus | `scripts/evaluate.sh` | 33 files, 20 expected findings, TP 20 / FP 0 / FN 0, file-level TN 9/9, precision = recall = F1 = 1.0, ≈1.2 s total |
 | Independent audit | `python3 scripts/audit.py` | 69 checks covering grammar, hand-computed data flow, graph edges, slices, rules, the HTTP workflow, malformed input, the interface contract, document accuracy, the claims the documents make about the code, and drift between the module table and the tree |
 | Mutation check | `python3 scripts/mutation_check.py` | 18 deliberate defects (parser, semantics, CFG, data flow, taint, slicing, rules, reporting); the suite has to catch every one, and does (18/18) |

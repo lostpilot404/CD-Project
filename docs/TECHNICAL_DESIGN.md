@@ -52,18 +52,19 @@ itself. `python3 -m codetrace.api` is the whole deployment.
 | `codetrace/reporting` | 3 | 650 | JSON report, self-contained HTML report |
 | `codetrace/api` | 4 | 1152 | HTTP server, routing, request validation, limits, schemas catalogue, `python3 -m` entry point |
 | `codetrace/*.py` | 2 | 22 | version constants and the package docstring |
-| `tests/` | 18 | 6195 | lexer, parser, semantics, CFG, data flow, taint, slicing, rules, API, reporting, end-to-end workflow, audit and mutation-check self-tests |
-| `frontend/` | 21 | 3486 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
-| `frontend/tests/` | 5 | 2108 | stub DOM, harness, library tests, view tests against a real engine |
+| `tests/` | 18 | 6212 | lexer, parser, semantics, CFG, data flow, taint, slicing, rules, API, reporting, end-to-end workflow, audit and mutation-check self-tests |
+| `frontend/` | 21 | 3487 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
+| `frontend/tests/` | 5 | 2115 | stub DOM, harness, library tests, view tests against a real engine |
 | `evaluation/` | 2 | 754 | labelled corpus harness and `expectations.json` |
-| `scripts/` | 6 | 2272 | dev server, full test run, corpus evaluation, independent audit, mutation check, project-report builder |
-| `docs/` | 17 | 6341 | the documentation set (see `README.md`), including the generated project report |
+| `scripts/` | 6 | 2261 | dev server, full test run, corpus evaluation, independent audit, mutation check, project-report builder |
+| `docs/` | 12 | 3871 | Markdown documentation and editable project-report source (see `README.md`) |
 | `examples/` | 34 | 307 | 33 labelled `.ctc` sources and one example rule file |
 
-Total implementation: 12 766 lines of Python in `codetrace/` (39 files), 6 195
-lines of engine tests, 5 594 lines of frontend assets (of which 2 108 are the
-interface tests), 2 272lines of scripts and 6 341 lines of documentation.
+Total implementation: 12 766 lines of Python in `codetrace/` (39 files), 6 212
+lines of engine tests, 5 602 lines of frontend assets (of which 2 115 are the
+interface tests), 2 261 lines of scripts and 3 871 lines of documentation.
 Counted with `wc -l`-style line counts, which include blank lines and comments.
+Documentation counts cover Markdown sources, not the generated PDF.
 The table is **checked**: `python3 scripts/audit.py` re-derives every row from
 the tree and fails if a number here disagrees, so a stale row cannot survive a
 green audit. When the audit reports drift, the same tool fixes it:

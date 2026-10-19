@@ -68,7 +68,7 @@ PROSE_TOTALS = re.compile(
     r"Total implementation:\s*(?P<python_lines>[\d ]+)\s+lines of Python in `codetrace/`\s*"
     r"\((?P<python_files>\d+)\s+files\),\s*(?P<engine_test_lines>[\d ]+)\s+lines of engine tests,\s*"
     r"(?P<frontend_asset_lines>[\d ]+)\s+lines of frontend assets \(of which\s*"
-    r"(?P<interface_test_lines>[\d ]+)\s+are the\s+interface tests\),\s*(?P<script_lines>[\d ]+)\s*"
+    r"(?P<interface_test_lines>[\d ]+)\s+are the\s+interface tests\),\s*(?P<script_lines>[\d ]+)\s+"
     r"lines of scripts and\s*(?P<documentation_lines>[\d ]+)\s+lines of documentation\."
 )
 
@@ -582,7 +582,8 @@ def check_run_summary() -> None:
 # ---------------------------------------------------------------------------
 def check_documentation() -> None:
     section("documents match the repository")
-    documents = [os.path.join(ROOT, "README.md")]
+    documents = [os.path.join(ROOT, "README.md"),
+                 os.path.join(FRONTEND, "js", "views", "docs.js")]
     docs_dir = os.path.join(ROOT, "docs")
     documents += [os.path.join(docs_dir, name) for name in sorted(os.listdir(docs_dir))
                   if name.endswith(".md")]
@@ -596,7 +597,7 @@ def check_documentation() -> None:
         for reference in re.findall(
             r"(?<![\w/.])"
             r"(?:codetrace|docs|frontend|scripts|examples|tests|evaluation)"
-            r"/[A-Za-z0-9_./\-]+\.(?:md|py|sh|json|js|ctrule|ctc)",
+            r"/[A-Za-z0-9_./\-]+\.(?:md|pdf|py|sh|json|js|ctrule|ctc)",
             text,
         ):
             if not os.path.exists(os.path.join(ROOT, reference)):
@@ -635,7 +636,7 @@ def check_documentation() -> None:
         with open(requirements, encoding="utf-8") as handle:
             third_party = [line for line in handle
                            if line.strip() and not line.startswith("#")]
-    check("the project needs no third-party Python package", not third_party, third_party)
+    check("the application needs no third-party Python package", not third_party, third_party)
 
 
 # ---------------------------------------------------------------------------
@@ -763,7 +764,7 @@ def check_claims() -> None:
         "frontend/tests/": measure("frontend/tests"),
         "evaluation/": measure("evaluation"),
         "scripts/": measure("scripts"),
-        "docs/": measure("docs"),
+        "docs/": measure("docs", ".md"),
         "examples/": measure("examples"),
     }
     # frontend/ in the table means the interface assets, which are everything
@@ -783,7 +784,7 @@ def check_claims() -> None:
             drift.append(f"{name}: table says {actual}, tree has {expected}")
     # The prose paragraph below the table states the same measurements in words.  It is
     # checked here rather than as a separate check so that the documented count of
-    # independent checks (README.md, docs/FINAL_REPORT.md) stays accurate.
+    # independent checks quoted in the README and project report stays accurate.
     def prose_totals() -> dict:
         python_rows = ("codetrace/frontend", "codetrace/semantics", "codetrace/analysis",
                        "codetrace/rules", "codetrace/findings", "codetrace/reporting",
