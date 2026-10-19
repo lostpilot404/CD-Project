@@ -64,7 +64,9 @@ export function renderToolbar(container, { state, onFilter, onSort, findings }) 
 }
 
 function findingCard(finding, selected, onSelect) {
-  return el('li', { class: 'finding-card', 'aria-selected': String(selected) }, [
+  // aria-selected is not allowed on a plain <li> (axe: aria-allowed-attr);
+  // aria-current marks the selected item and is valid on any element.
+  return el('li', { class: 'finding-card', 'aria-current': selected ? 'true' : null }, [
     el('button', {
       type: 'button',
       class: 'finding-card__select',
@@ -102,12 +104,17 @@ function pathView(finding, { loading = false } = {}) {
   ));
 }
 
-export function renderFindingDetail(container, { finding, detail, source, onShowSlice, onSelectStatement }) {
+export function renderFindingDetail(container, { finding, detail, source, draftSource, onShowSlice, onSelectStatement }) {
   if (!finding) {
     render(container, el('p', { class: 'empty-state', text: 'Select a finding to see its evidence, the data-flow path and the remediation hint.' }));
     return;
   }
   const record = detail || finding;
+  // The line numbers in `record` belong to the analysed text.  If the editor has
+  // moved on, say so instead of printing the finding's lines next to other code.
+  const sourceNote = draftSource !== undefined && draftSource !== source
+    ? el('p', { class: 'hint', text: 'The editor has changed since this run: the context below is the text that was analysed, and the line numbers refer to it.' })
+    : null;
   // The run summary lists findings without their evidence path, while the
   // findings list and the detail endpoint include it; the placeholder is only
   // shown when neither has produced a path yet.
@@ -156,6 +163,7 @@ export function renderFindingDetail(container, { finding, detail, source, onShow
     el('h3', { text: 'Remediation' }),
     el('p', { text: record.remediation }),
     el('h3', { text: 'Source context' }),
+    sourceNote,
     // Read-only here: a line number is not a statement id, so clicking a line
     // cannot select the statement behind it, and this page has no statement
     // panel to show it in.  (The handler once treated the line number as a
@@ -248,7 +256,10 @@ export async function renderFindings(container, { state, onFilter, onSort, onSel
   renderFindingDetail(detailNode, {
     finding: filtered.find((f) => f.id === state.selectedFinding) || null,
     detail: state.selectedFindingDetail,
-    source: state.source,
+    // The analysed text, not the live draft: the finding's line numbers belong
+    // to it, and rendering them beside a newer draft misattributed the result.
+    source: state.analysedSource || state.source,
+    draftSource: state.source,
     onShowSlice,
     onSelectStatement,
   });

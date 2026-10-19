@@ -284,8 +284,10 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
             self._error(error.status, error.code, error.message, error.detail)
         except Exception as exc:  # pragma: no cover - unexpected server fault
             traceback.print_exc()
-            self._error(500, "internal-error", "the analysis engine reported an internal error",
-                        str(exc))
+            # The exception text stays in the server log: docs/API.md §1 promises a
+            # generic client-visible message, and echoing str(exc) leaked internal
+            # detail (e.g. "invalid literal for int() with base 10").
+            self._error(500, "internal-error", "the analysis engine reported an internal error")
 
     def do_POST(self) -> None:  # noqa: N802
         try:
@@ -304,8 +306,10 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
             self._error(error.status, error.code, error.message, error.detail)
         except Exception as exc:  # pragma: no cover
             traceback.print_exc()
-            self._error(500, "internal-error", "the analysis engine reported an internal error",
-                        str(exc))
+            # The exception text stays in the server log: docs/API.md §1 promises a
+            # generic client-visible message, and echoing str(exc) leaked internal
+            # detail (e.g. "invalid literal for int() with base 10").
+            self._error(500, "internal-error", "the analysis engine reported an internal error")
 
     # ------------------------------------------------------------------
     # GET endpoints
@@ -367,7 +371,15 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/grammar":
-            tables = parser_tables(query.get("mode", "lalr"))
+            mode = query.get("mode") or "lalr"
+            if mode not in ("lalr", "slr", "canonical"):
+                # grammar.build_automaton raises GrammarError for an unknown mode,
+                # which is not an ApiError: the handler turned a bad query parameter
+                # into a 500.  docs/API.md §1 lists invalid-parser-mode under 400 and
+                # /api/analyze already answers exactly this way for parser_mode.
+                raise ApiError(400, "invalid-parser-mode",
+                               "mode must be one of lalr, slr, canonical")
+            tables = parser_tables(mode)
             grammar = tables.grammar
             self._send_json(
                 {
@@ -562,9 +574,12 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
             payload["analysis"] = kind
             self._send_json(payload)
             return
-        match = re.fullmatch(r"/statements/(\d+)", rest)
+        match = re.fullmatch(r"/statements/([^/]+)", rest)
         if match:
-            sid = int(match.group(1))
+            try:
+                sid = int(match.group(1))
+            except ValueError as exc:
+                raise ApiError(400, "invalid-parameter", "'sid' must be an integer") from exc
             self._send_json(self._statement_detail(program, sid))
             return
         if rest == "/graph":
@@ -572,7 +587,16 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
             graph = program.dependencies
             if graph is None:
                 raise ApiError(409, "graph-unavailable", "no dependency graph was built for this run")
-            self._send_json(graph.to_json(kinds=kinds or None, limit=int(query.get("limit", 4000))))
+            limit_text = query.get("limit")
+            limit = 4000
+            if limit_text:
+                try:
+                    limit = int(limit_text)
+                except ValueError as exc:
+                    raise ApiError(400, "invalid-parameter", "'limit' must be an integer") from exc
+                if limit < 0:
+                    raise ApiError(400, "invalid-parameter", "'limit' must not be negative")
+            self._send_json(graph.to_json(kinds=kinds or None, limit=limit))
             return
         if rest == "/slice":
             criterion = query.get("sid")
@@ -675,6 +699,15 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
 
     def _resolve_rules(self, payload: dict, use_builtin: bool = True) -> Tuple[RuleSet, list]:
         rules_text = payload.get("rules")
+        if rules_text is not None and not isinstance(rules_text, str):
+            # Silently falling back to the built-in rules would report a different
+            # rule set than the caller asked for without saying so.
+            raise ApiError(400, "invalid-parameter", "'rules' must be a string")
+        if isinstance(rules_text, str) and len(rules_text.encode("utf-8")) > MAX_SOURCE_BYTES:
+            # The documented rule-file limit (API.md sec.7) applies wherever a rule
+            # file is accepted; /api/analyze used to accept megabytes of rules
+            # while /api/rules/validate rejected the same text with 413.
+            raise ApiError(413, "rules-too-large", "the rule file exceeds the analysis limit")
         builtin, diagnostics = load_builtin_rules()
         if not isinstance(rules_text, str) or not rules_text.strip():
             if use_builtin:
@@ -730,8 +763,19 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
 
     def _compare(self, payload: dict) -> None:
         before_id, after_id = payload.get("before"), payload.get("after")
-        if not before_id or not after_id:
+        # The type test comes before the emptiness test.  With the emptiness test first,
+        # a *present* but empty list or object (`{}`, `[]`) was reported as
+        # "missing-parameter", which says the field was absent when it was not; only the
+        # key being absent or explicitly null is "missing".
+        if before_id is None or after_id is None:
             raise ApiError(400, "missing-parameter", "'before' and 'after' run ids are required")
+        if not isinstance(before_id, str) or not isinstance(after_id, str):
+            # ComparisonRequest (docs/API.md §6) types both as strings.  A truthy
+            # non-string used to reach RunStore.get, whose dict lookup raised
+            # "unhashable type" for a list/dict and surfaced as a 500.
+            raise ApiError(400, "invalid-parameter", "'before' and 'after' must be run id strings")
+        if not before_id or not after_id:
+            raise ApiError(400, "missing-parameter", "'before' and 'after' run ids must not be empty")
         before = self.store.get(before_id)
         after = self.store.get(after_id)
         if before is None or after is None:

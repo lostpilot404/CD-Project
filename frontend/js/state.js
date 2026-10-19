@@ -33,6 +33,11 @@ export const state = {
   slicing: { sid: null, direction: 'backward', source: 'statement', data: null },
   /** Result of the last run comparison, if any. */
   comparison: null,
+  /**
+   * Bumped by every user-initiated reset (the Clear button).  A response that
+   * was in flight when the reset happened must not repopulate the interface.
+   */
+  resetCounter: 0,
 };
 
 export function subscribe(listener) {
@@ -53,6 +58,7 @@ export function resetRun() {
   // preferences (graph mode/kinds, analysis, direction) are kept; everything
   // that describes the run itself is dropped.
   update({
+    resetCounter: state.resetCounter + 1,
     run: null,
     source: '',
     statementsById: {},
@@ -82,6 +88,7 @@ export function resetForNewRun(run, source) {
   update({
     run,
     source,
+    analysedSource: source,
     statementsById: {},
     selectedFinding: null,
     selectedFindingDetail: null,

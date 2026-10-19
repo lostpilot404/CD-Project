@@ -13,6 +13,7 @@
   --muted: #5a6472;
   --accent: #1f5fbf;
   --accent-weak: #e6eefb;
+  --accent-ink: #ffffff;
   --critical: #a4161a;
   --high: #c2410c;
   --medium: #9a6700;
@@ -24,6 +25,36 @@
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
+/* Dark theme.  Applied by the theme control (frontend/js/app.js): the button
+   stores light/dark/system, and "system" follows prefers-color-scheme live. */
+body.dark {
+  --bg: #14171c;
+  --surface: #1b1f26;
+  --surface-alt: #23272f;
+  --border: #3a4048;
+  --text: #e8eaed;
+  --muted: #a9b1bd;
+  --accent: #7fb0ff;
+  --accent-weak: #22304a;
+  /* White on the dark theme's accent is 2.2:1: the accent is a light blue there
+     (it is the link colour), so text painted on it has to be dark. */
+  --accent-ink: #14171c;
+  --critical: #ff8a8f;
+  --high: #ffb086;
+  --medium: #f0cd6a;
+  --low: #86d9ae;
+  --info: #9db8ee;
+  --ok: #7fd08a;
+  color-scheme: dark;
+}
+
+/* The dark theme lightens every severity colour, so white text on them drops to
+   1.8-2.2:1.  The audit observed every badge variant, not just the three an
+   unrendered test page happened to show. */
+body.dark .badge--HIGH, body.dark .badge--CRITICAL, body.dark .badge--MEDIUM,
+body.dark .badge--LOW, body.dark .badge--INFO, body.dark .badge--error,
+body.dark .badge--info { color: #14171c; }
+
 body.contrast {
   --bg: #ffffff;
   --surface: #ffffff;
@@ -33,6 +64,7 @@ body.contrast {
   --muted: #1a1a1a;
   --accent: #00429d;
   --accent-weak: #eef2ff;
+  --accent-ink: #ffffff;            /* high contrast is light-on-dark on purpose */
 }
 
 * { box-sizing: border-box; }
@@ -67,9 +99,10 @@ code, kbd, pre, .mono { font-family: var(--mono); font-size: .9em; }
 
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: .4rem 1rem;
   padding: .65rem 1rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -77,7 +110,8 @@ code, kbd, pre, .mono { font-family: var(--mono); font-size: .9em; }
   top: 0;
   z-index: 20;
 }
-.topbar__brand { display: flex; align-items: center; gap: .6rem; }
+.topbar__brand { display: flex; align-items: center; gap: .6rem; min-width: 0; }
+.topbar__status { display: flex; flex-wrap: wrap; gap: .25rem; min-width: 0; }
 .topbar__logo {
   display: inline-grid;
   place-items: center;
@@ -85,7 +119,7 @@ code, kbd, pre, .mono { font-family: var(--mono); font-size: .9em; }
   height: 2rem;
   border-radius: var(--radius);
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   font-weight: 700;
   letter-spacing: .02em;
 }
@@ -165,8 +199,14 @@ code, kbd, pre, .mono { font-family: var(--mono); font-size: .9em; }
   cursor: pointer;
 }
 .button:hover { background: var(--surface-alt); }
-.button--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.button--primary:hover { filter: brightness(1.08); }
+.button--primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.button--primary:hover {
+  /* .button:hover (0,2,0) outranks .button--primary (0,1,0), so without this the
+     hover background replaced the accent and left white text on the page
+     background -- axe reported a contrast of 1.12 on an enabled button. */
+  background: var(--accent);
+  filter: brightness(1.08);
+}
 .button--ghost { background: transparent; }
 .button--small { padding: .2rem .5rem; font-size: .82rem; }
 .button[aria-pressed="true"] { background: var(--accent-weak); border-color: var(--accent); }
@@ -372,7 +412,7 @@ table.data td.num { font-variant-numeric: tabular-nums; text-align: right; }
   height: 1.4rem;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   font-size: .7rem;
   display: grid;
   place-items: center;
@@ -423,6 +463,10 @@ table.data td.num { font-variant-numeric: tabular-nums; text-align: right; }
 .kv { display: grid; grid-template-columns: minmax(8rem, auto) minmax(0, 1fr); gap: .2rem .8rem; font-size: .88rem; }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
+/* Long unbreakable tokens (rule-set fingerprints, compact JSON, engine
+   versions) must wrap instead of widening the page: measured overflow was
+   327 px at #/rules and 23 px at #/overview before this rule. */
+.hint, .stat__value, .badge, .mono, dd, td, caption { overflow-wrap: anywhere; }
 
 details summary { cursor: pointer; font-weight: 600; margin: .4rem 0; }
 .check-list { list-style: none; margin: 0; padding: 0; }

@@ -158,6 +158,27 @@ export function renderGraphView(container, { state, onSelectNode, onMode, onKind
   }
 
   const graph = state.graph.data;
+  if (!state.graph.kinds.length) {
+    // Unchecking every kind sent no filter at all, and the engine's documented
+    // default for an empty filter is *every* kind, so "no kinds" silently drew
+    // all of them.  Say what is happening and offer the way back.
+    render(canvas, el('div', {}, [
+      el('p', { class: 'alert alert--info' },
+        'No edge kinds are selected, so no edges are drawn. Select at least one kind, or use the button below.'),
+      el('button', {
+        type: 'button',
+        class: 'button button--small',
+        text: 'Select all edge kinds',
+        on: {
+          click: () => {
+            for (const [kind] of KINDS) if (!state.graph.kinds.includes(kind)) onKinds(kind, true);
+          },
+        },
+      }),
+    ]));
+    render(side, [el('h2', { text: 'Legend' }), renderLegend()]);
+    return;
+  }
   if (state.graph.loadError) {
     render(canvas, el('p', { class: 'alert alert--error', text: `Could not load the program graph: ${state.graph.loadError}` }));
   } else if (!graph) {
@@ -192,6 +213,27 @@ function renderCfg(canvas, side, panel, { state, run, functions, cfgFunction, on
     return;
   }
   const graph = state.graph.data;
+  if (!state.graph.kinds.length) {
+    // Unchecking every kind sent no filter at all, and the engine's documented
+    // default for an empty filter is *every* kind, so "no kinds" silently drew
+    // all of them.  Say what is happening and offer the way back.
+    render(canvas, el('div', {}, [
+      el('p', { class: 'alert alert--info' },
+        'No edge kinds are selected, so no edges are drawn. Select at least one kind, or use the button below.'),
+      el('button', {
+        type: 'button',
+        class: 'button button--small',
+        text: 'Select all edge kinds',
+        on: {
+          click: () => {
+            for (const [kind] of KINDS) if (!state.graph.kinds.includes(kind)) onKinds(kind, true);
+          },
+        },
+      }),
+    ]));
+    render(side, [el('h2', { text: 'Legend' }), renderLegend()]);
+    return;
+  }
   if (state.graph.loadError) {
     render(canvas, el('p', { class: 'alert alert--error', text: `Could not load the control-flow graph: ${state.graph.loadError}` }));
   } else if (!graph || graph.function !== cfgFunction) {
