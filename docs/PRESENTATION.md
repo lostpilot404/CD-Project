@@ -82,7 +82,7 @@ line states what it observed.
 | Grammar | 102 productions, 51 terminals, 36 non-terminals | `python3 scripts/audit.py -v` |
 | Tables | 167 states in LALR and SLR, 656 canonical LR(1) states, 0 conflicts in all three modes | same |
 | Rule language | 40 productions, 78 states, 0 conflicts | `/api/rules` |
-| Tests | 256 engine tests + 27 interface tests | `python3 -m unittest discover -s tests -t .`, `cd frontend && npm test` |
+| Tests | 350 engine tests + 53 interface tests | `python3 -m unittest discover -s tests -t .`, `cd frontend && npm test` |
 | Audit | 69 checks | `python3 scripts/audit.py` |
 | Mutation check | 18/18 deliberate defects caught | `python3 scripts/mutation_check.py` |
 | Corpus | 33 labelled files, 20 expected findings, TP 20 / FP 0 / FN 0, TN 9/9, P = R = F1 = 1.0 | `scripts/evaluate.sh` |

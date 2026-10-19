@@ -17,6 +17,7 @@ import re
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -42,6 +43,19 @@ class AuditRunTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, output[-2000:])
         self.assertIn("checks passed", output)
         self.assertNotIn("[FAIL]", output)
+
+    def test_a_missing_pdf_is_reported_in_the_ui_document_map(self):
+        audit = load_audit()
+        report = os.path.join(ROOT, "docs", "CodeTrace_Project_Report.pdf")
+        real_exists = os.path.exists
+        output = io.StringIO()
+        # Simulate a deleted generated deliverable without moving a real file.
+        with patch.object(audit.os.path, "exists", side_effect=lambda path:
+                          path != report and real_exists(path)):
+            with contextlib.redirect_stdout(output):
+                audit.check_documentation()
+        self.assertIn("every file the documents reference exists", audit.FAILURES)
+        self.assertIn("docs.js -> docs/CodeTrace_Project_Report.pdf", output.getvalue())
 
 
 class ModuleTableTests(unittest.TestCase):
@@ -74,6 +88,10 @@ class ModuleTableTests(unittest.TestCase):
         named = set(re.findall(r"^\| `([^`]+)` \| \d+ \| \d+ \|", text, re.M))
         missing = measured - named
         self.assertEqual(missing, set(), f"rows missing from the table: {sorted(missing)}")
+        # Binary report bytes must not be interpreted as documentation lines.
+        markdown = [name for name in os.listdir(os.path.join(ROOT, "docs"))
+                    if name.endswith(".md")]
+        self.assertEqual(self.audit._MEASURED_MODULES["docs/"][0], len(markdown))
 
     def test_the_check_notices_a_wrong_number(self):
         # Break the table in a scratch copy, run the audit's own comparison

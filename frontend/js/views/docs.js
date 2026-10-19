@@ -19,7 +19,8 @@ const DOCUMENTS = [
   ['docs/LIMITATIONS.md', 'what the tool does not do, and the threat model of the tool itself'],
   ['docs/USER_GUIDE.md', 'running the app, using the interface, reading findings'],
   ['docs/PRESENTATION.md', 'presentation outline and viva questions'],
-  ['docs/FINAL_REPORT.md', 'the completion report: what was built and the evidence for each claim'],
+  ['docs/CodeTrace_Project_Report.md', 'editable source of the project report, including verification evidence'],
+  ['docs/CodeTrace_Project_Report.pdf', 'the finished BCSE307P project report'],
 ];
 
 export function renderDocs(container, { language, grammar }) {

@@ -12,6 +12,7 @@
 
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 
 import { loadPage, settle, startEngine, waitFor } from './harness.js';
 
@@ -357,6 +358,12 @@ test('the documentation view documents the language, diagnostics and limits', as
   assert.match(text, /SEM\d+/);
   assert.match(text, /DFA001|RULE\d+/);
   assert.ok(text.length > 500, 'the documentation page is substantive');
+  assert.match(text, /docs\/CodeTrace_Project_Report\.pdf/);
+  const documents = text.match(/README\.md|docs\/[A-Za-z0-9_]+\.(?:md|pdf)/g);
+  assert.ok(documents && documents.length > 10, 'the project document map is populated');
+  for (const path of documents) {
+    assert.ok(existsSync(new URL(`../../${path}`, import.meta.url)), `${path} exists in the repository`);
+  }
 });
 
 test('no view renders a placeholder leak', async () => {

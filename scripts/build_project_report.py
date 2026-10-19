@@ -742,22 +742,8 @@ def main(argv=None):
             "pagination changed between passes; the contents page would be "
             "stale")
 
-    # A page holding only one or two lines is almost always the tail of a
-    # paragraph that could have fitted on the previous page; report it so the
-    # source can be tightened rather than leaving the gap unnoticed.
-    import pymupdf  # optional, build-time only
-
-    document = pymupdf.open(args.out)
-    for number, page in enumerate(document, start=1):
-        text = page.get_text().strip()
-        body = "\n".join(text.split("\n")[:-1]).strip()  # drop the folio
-        if len(body.split()) < 12:
-            print("warning: page %d has only %d words"
-                  % (number, len(body.split())))
-    document.close()
-
     print("wrote %s" % args.out)
-    print("pages: %d   contents entries: %d" % (max(pages.values()), len(entries)))
+    print("contents entries: %d" % len(entries))
     for sid, text, _level, _bold in entries:
         print("  p.%-3d %s" % (pages[sid], text))
 
@@ -771,13 +757,15 @@ def main(argv=None):
             pages3, _ = build(blocks, abstract, pages, handle.name)
             if pages3 != pages2:
                 raise SystemExit("a rebuild produced different pagination")
-            first = open(args.out, "rb").read()
-            second = open(handle.name, "rb").read()
-            print("rebuild: %d pages, %d bytes, sha256 %s" % (
-                max(pages3.values()), len(second),
-                hashlib.sha256(second).hexdigest()[:16]))
-            print("same page count: %s; byte-identical: %s"
-                  % (len(first) == len(second), first == second))
+            with open(args.out, "rb") as first_file, open(handle.name, "rb") as second_file:
+                first = first_file.read()
+                second = second_file.read()
+            print("rebuild: %d bytes, sha256 %s" % (
+                len(second), hashlib.sha256(second).hexdigest()[:16]))
+            print("same heading pagination: %s; byte-identical: %s"
+                  % (pages3 == pages2, first == second))
+            if first != second:
+                raise SystemExit("a rebuild produced different PDF bytes")
         finally:
             os.unlink(handle.name)
     return 0

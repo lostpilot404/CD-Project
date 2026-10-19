@@ -1,8 +1,7 @@
-"""Regression tests for the defects confirmed by the hostile audit.
+"""Regression tests for compiler, HTTP API and interface defects.
 
-Every test here reproduces a failure that was first observed against the running
-application (browser or HTTP) and recorded in ``docs/HOSTILE_AUDIT_REPORT.md``
-with its evidence classification.  The tests are written against the documented
+Every test here reproduces a failure first observed against the running
+application (browser or HTTP). The tests are written against the documented
 behaviour -- ``docs/LANGUAGE.md`` §1/§4, ``docs/API.md`` §1/§4/§7 and
 ``docs/USER_GUIDE.md`` §6 -- not against the implementation's previous output.
 
