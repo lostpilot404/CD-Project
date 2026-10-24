@@ -442,10 +442,10 @@ scope 2 (block)    symbol #2 'i'      string   declared 1:39   -> SEM018 shadowi
 
 The reference inside the block resolves to `#2`, the `return i` to `#1`; the
 data-flow and taint results are expressed with those ids, so the two `i`s stay
-separate (`tests/test_semantics.py::ScopeTests`).
+separate (`tests/test_semantics.py::SymbolTableTests`).
 
 **Implementation / tests / limits.** `codetrace/semantics/`;
-`tests/test_semantics.py` (18 tests). Limit: no user-defined types, no
+`tests/test_semantics.py` (20 tests). Limit: no user-defined types, no
 conversions beyond the documented narrowing rule, no overloading.
 
 ---
@@ -538,7 +538,7 @@ reported per run in `metrics["dataflow_iterations"]` and per function in the
 `/dataflow` payload.
 
 **Implementation / tests / limits.** `codetrace/analysis/dataflow.py`,
-`tests/test_dataflow.py` (20 tests, including hand-computed fixpoints and the
+`tests/test_dataflow.py` (26 tests, including hand-computed fixpoints and the
 iteration cap). Limit: the framework is intra-procedural — the interprocedural
 part is the taint layer (§16) — and the domain is finite and atom-based, so it
 cannot express value-dependent facts.
@@ -585,7 +585,7 @@ fixpoint finds; a single pass over the blocks would report `{d0, d1}`.
 `scripts/audit.py` re-checks exactly these sets.
 
 **Implementation / tests / limits.** `codetrace/analysis/reaching_definitions.py`;
-`tests/test_dataflow.py::ReachingDefinitionTests`, `tests/test_workflow.py`.
+`tests/test_dataflow.py::ReachingDefinitionsTests`, `tests/test_workflow.py`.
 Limit: array elements and struct fields are not distinguished.
 
 ---
@@ -861,7 +861,7 @@ security slice equals the backward slice of the sink here; in a program where
 the sink's value also flows onwards, it is strictly larger.
 
 **Implementation / tests / limits.** `codetrace/analysis/slicing.py`;
-`tests/test_slicing.py` (20 tests: direction, criteria, closure, reasons,
+`tests/test_slicing.py` (22 tests: direction, criteria, closure, reasons,
 determinism, subgraph consistency, search states). Limit: slices are
 conservative over-approximations (the note says so), they use the same
 may-overlap edges as §17, and array/alias imprecision carries over.

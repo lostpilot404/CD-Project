@@ -373,6 +373,13 @@ def analyse_source(
     program.findings = build_findings(program)
     timings["findings_seconds"] = round(time.perf_counter() - findings_started, 6)
 
+    # The dependency graph is built before the findings exist (the findings
+    # summarise the analyses that run over it), so the ``source-to-sink`` edges
+    # that mark a reported flow are appended here, once every finding's path is
+    # known.  They are part of the graph every later consumer reads.
+    if program.dependencies is not None:
+        dependencies.add_source_sink_edges(program)
+
     # -- diagnostics merge -------------------------------------------------
     diagnostics: List[Diagnostic] = []
     diagnostics.extend(parse.diagnostics)

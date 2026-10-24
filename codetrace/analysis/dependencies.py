@@ -457,6 +457,67 @@ def build_graph(program) -> DependencyGraph:
     return graph
 
 
+def add_source_sink_edges(program) -> int:
+    """Add one ``source-to-sink`` edge per hop of every reported flow's path.
+
+    ``EDGE_KINDS``, the module docstring, the API schema and the interface legend
+    all declare ``source-to-sink`` as an edge kind of the dependency graph, and
+    the path of a finding is an ordered chain of statements.  Without these
+    edges the graph a caller reads -- and the Program Graph view that renders
+    it -- would show every other relation of the program but omit the reported
+    flows themselves, which is the one relation a reviewer came to see.
+
+    The findings are produced after the graph is built (they summarise the
+    analyses that run over it), so the edges are appended here, once the paths
+    exist.  They are ordinary graph edges: they take part in the edge-kind
+    filters and in the subgraph a slice induces, so the slicing view shows the
+    route through the same edges the graph view draws.
+
+    ``source-to-sink`` edges are *not* part of the backward/forward slice
+    traversal's justification: a slice's membership is decided by the data,
+    control, call, return and define edges it follows, exactly as before.
+    """
+    graph = program.dependencies
+    if graph is None:
+        return 0
+    added = 0
+    seen: Set[Tuple[str, str, str]] = set()
+    for finding in program.findings:
+        for step in finding.path:
+            src_sid = step.get("from_sid", -1)
+            dst_sid = step.get("sid", -1)
+            if src_sid < 0 or dst_sid < 0:
+                continue
+            src, dst = f"s{src_sid}", f"s{dst_sid}"
+            if src not in graph.nodes or dst not in graph.nodes:
+                continue
+            # A path that explains two things about one statement yields a hop
+            # from that statement to itself; a relation joins two statements, so
+            # those degenerate self-loops are left out.
+            if src == dst:
+                continue
+            if (src, dst, SOURCE_SINK) in seen:
+                continue
+            seen.add((src, dst, SOURCE_SINK))
+            label = step.get("label") or step.get("kind") or "path step"
+            detail = step.get("detail")
+            reason = f"source-to-sink path step: {label}"
+            if detail:
+                reason = f"{reason} ({detail})"
+            graph.add_edge(
+                DepEdge(
+                    src=src,
+                    dst=dst,
+                    kind=SOURCE_SINK,
+                    reason=reason,
+                    symbol=step.get("symbol", ""),
+                    taint_atoms=tuple(step.get("atoms", [])),
+                )
+            )
+            added += 1
+    return added
+
+
 def _sid_of_node(program, node: Node) -> int:
     for sid, statement in program.statements.items():
         if statement is node:

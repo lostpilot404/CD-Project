@@ -228,6 +228,6 @@ curl -s localhost:8000/api/analyze -H 'content-type: application/json' \
 | python3 -m json.tool | head -40
 ```
 
-`tests/test_api.py` (36 tests) and `tests/test_workflow.py` (14 tests) exercise
+`tests/test_api.py` (41 tests) and `tests/test_workflow.py` (20 tests) exercise
 every endpoint above over real HTTP, including the error codes, the size limits,
 the traversal attempts and the comparison semantics.

@@ -50,10 +50,13 @@ body.dark {
 
 /* The dark theme lightens every severity colour, so white text on them drops to
    1.8-2.2:1.  The audit observed every badge variant, not just the three an
-   unrendered test page happened to show. */
+   unrendered test page happened to show.  `badge--warning` is a light cream
+   chip in both themes (its warning is a dark ink on cream, like the text on the
+   rest of the surface), so in dark mode the light `--text` ink on that cream was
+   1.07:1; it is switched to dark ink here like the severity chips. */
 body.dark .badge--HIGH, body.dark .badge--CRITICAL, body.dark .badge--MEDIUM,
 body.dark .badge--LOW, body.dark .badge--INFO, body.dark .badge--error,
-body.dark .badge--info { color: #14171c; }
+body.dark .badge--info, body.dark .badge--warning { color: #14171c; }
 
 body.contrast {
   --bg: #ffffff;
@@ -365,6 +368,9 @@ table.data td.num { font-variant-numeric: tabular-nums; text-align: right; }
 .graph-svg .edge--call, .graph-svg .edge--return { stroke: var(--accent); }
 .graph-svg .edge--sanitize { stroke: var(--ok); stroke-dasharray: 2 2; }
 .graph-svg .edge--define { stroke: #7a5195; }
+/* Source-to-sink edges mark the route a reported finding travels, so they read
+   as a heavier, longer-dashed line than the plain data and taint edges. */
+.graph-svg .edge--source-to-sink { stroke: var(--critical); stroke-width: 2.4; stroke-dasharray: 9 4; }
 /* Control-flow edge kinds: the taken branch is solid, the untaken one dashed,
    and the edge that closes a loop reads as a loop. */
 .graph-svg .edge--true { stroke: var(--ok); stroke-width: 1.6; }
@@ -387,6 +393,7 @@ table.data td.num { font-variant-numeric: tabular-nums; text-align: right; }
 .legend__swatch--call { background: var(--accent); }
 .legend__swatch--sanitize { background: var(--ok); }
 .legend__swatch--define { background: #7a5195; }
+.legend__swatch--source-to-sink { background: repeating-linear-gradient(90deg, var(--critical) 0 9px, transparent 9px 13px); }
 .legend__swatch--cfg-sequential { background: var(--muted); }
 .legend__swatch--cfg-true { background: var(--ok); }
 .legend__swatch--cfg-false { background: repeating-linear-gradient(90deg, var(--medium) 0 4px, transparent 4px 7px); }

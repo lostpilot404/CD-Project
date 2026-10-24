@@ -17,6 +17,7 @@ const KINDS = [
   ['return', 'return'],
   ['define', 'definition'],
   ['sanitize', 'sanitization'],
+  ['source-to-sink', 'source-to-sink'],
 ];
 
 const CFG_EDGE_KINDS = [

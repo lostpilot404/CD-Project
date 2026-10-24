@@ -99,7 +99,7 @@ whoever uses the app. The design assumption is that **both are data**.
 
 * The pipeline is parsers and analyses only: no `eval`, `exec`, `compile`,
   `__import__`, `subprocess`, `os.system` or dynamic import anywhere in
-  `codetrace/` (asserted by `tests/test_rules.py::UntrustedInputTests`, which
+  `codetrace/` (asserted by `tests/test_rules.py::RuleValidationTests`, which
   scans the package sources).
 * Uploading a program that would create a canary file when run leaves the file
   absent — checked by `tests/test_api.py` and `scripts/audit.py`.
@@ -139,7 +139,7 @@ filename to read.
 
 Every error uses one envelope
 (`{"error": {"code", "message", "detail"}}`) and never contains a stack trace, a
-filesystem path or environment content — `tests/test_api.py::ErrorEnvelopeTests`
+filesystem path or environment content — `tests/test_api.py::ValidationAndErrorTests`
 asserts the absence of `Traceback` and `/home/` in every error body. The JSON and
 HTML reports contain the analysed source (which the requester supplied) and the
 filename as given, escaped for HTML.

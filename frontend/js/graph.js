@@ -29,6 +29,7 @@ export const EDGE_LEGEND = [
   { kind: 'return', label: 'return (callee → call site)', className: 'legend__swatch--call' },
   { kind: 'sanitize', label: 'sanitize (a rule removes this taint)', className: 'legend__swatch--sanitize' },
   { kind: 'define', label: 'define (statement → its definition)', className: 'legend__swatch--define' },
+  { kind: 'source-to-sink', label: 'source-to-sink (the reported flow path)', className: 'legend__swatch--source-to-sink' },
 ];
 
 export function renderLegend() {

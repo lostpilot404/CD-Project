@@ -26,7 +26,7 @@ export const state = {
   /** Sort key for the finding list. */
   sort: 'severity',
   /** Graph view selection; `data` holds the graph the engine returned. */
-  graph: { mode: 'dependency', kinds: ['data', 'control', 'call', 'return', 'taint', 'define', 'sanitize'], data: null },
+  graph: { mode: 'dependency', kinds: ['data', 'control', 'call', 'return', 'taint', 'define', 'sanitize', 'source-to-sink'], data: null },
   /** Data-flow view selection; `data` holds the solution the engine returned. */
   dataflow: { function: null, analysis: 'reaching', data: null },
   /** Slicing selection; `data` holds the slice the engine returned. */
