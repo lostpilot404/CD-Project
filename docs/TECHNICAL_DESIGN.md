@@ -46,23 +46,23 @@ itself. `python3 -m codetrace.api` is the whole deployment.
 | --- | --- | --- | --- |
 | `codetrace/frontend` | 9 | 3277 | tokens, lexer, grammar (NULLABLE/FIRST/FOLLOW, closure, GOTO, canonical/LALR/SLR automata), LR tables and parser, AST nodes, grammar documentation, pipeline (`parse_source`, cached `parser_tables`) |
 | `codetrace/semantics` | 4 | 1352 | scopes and symbol table, external resolution through the rule set, type checks, per-statement accesses (reads/writes/definitions) |
-| `codetrace/analysis` | 11 | 4062 | CFG, data-flow framework + reaching definitions / liveness / definite assignment, taint, dependency graph, slicing, `Program` orchestration |
+| `codetrace/analysis` | 11 | 4130 | CFG, data-flow framework + reaching definitions / liveness / definite assignment, taint, dependency graph, slicing, `Program` orchestration |
 | `codetrace/rules` | 3 | 1026 | rule model and validation, declarative rule language parser, built-in rule loader (plus `builtin/standard.ctrule`) |
 | `codetrace/findings` | 3 | 1225 | finding model and stable identity, run comparison, explanation and certainty |
 | `codetrace/reporting` | 3 | 650 | JSON report, self-contained HTML report |
 | `codetrace/api` | 4 | 1152 | HTTP server, routing, request validation, limits, schemas catalogue, `python3 -m` entry point |
 | `codetrace/*.py` | 2 | 22 | version constants and the package docstring |
 | `tests/` | 18 | 6212 | lexer, parser, semantics, CFG, data flow, taint, slicing, rules, API, reporting, end-to-end workflow, audit and mutation-check self-tests |
-| `frontend/` | 21 | 3487 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
+| `frontend/` | 21 | 3496 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
 | `frontend/tests/` | 5 | 2115 | stub DOM, harness, library tests, view tests against a real engine |
 | `evaluation/` | 2 | 754 | labelled corpus harness and `expectations.json` |
 | `scripts/` | 6 | 2261 | dev server, full test run, corpus evaluation, independent audit, mutation check, project-report builder |
-| `docs/` | 12 | 3871 | Markdown documentation and editable project-report source (see `README.md`) |
+| `docs/` | 12 | 3875 | Markdown documentation and editable project-report source (see `README.md`) |
 | `examples/` | 34 | 307 | 33 labelled `.ctc` sources and one example rule file |
 
-Total implementation: 12 766 lines of Python in `codetrace/` (39 files), 6 212
-lines of engine tests, 5 602 lines of frontend assets (of which 2 115 are the
-interface tests), 2 261 lines of scripts and 3 871 lines of documentation.
+Total implementation: 12 834 lines of Python in `codetrace/` (39 files), 6 212
+lines of engine tests, 5 611 lines of frontend assets (of which 2 115 are the
+interface tests), 2 261 lines of scripts and 3 875 lines of documentation.
 Counted with `wc -l`-style line counts, which include blank lines and comments.
 Documentation counts cover Markdown sources, not the generated PDF.
 The table is **checked**: `python3 scripts/audit.py` re-derives every row from
@@ -178,7 +178,7 @@ Validation happens *before* work: unknown parameters are rejected with a
 `400 invalid-parameter`, an unsupported parser mode with `400
 invalid-parser-mode`, a broken rule file with `422 invalid-rules`, and an
 oversized body with `413`. Every error uses the same envelope and never contains
-a stack trace or a server path (`tests/test_api.py::ErrorEnvelopeTests`).
+a stack trace or a server path (`tests/test_api.py::ValidationAndErrorTests`).
 
 ## 8. Security posture of the tool itself
 
@@ -186,7 +186,7 @@ a stack trace or a server path (`tests/test_api.py::ErrorEnvelopeTests`).
   analyses only. `tests/test_api.py` and `scripts/audit.py` both upload a program
   that would create a canary file if executed and assert the file never appears.
 * Uploaded rule files go through the rule-language parser and declarative
-  validation; `tests/test_rules.py::UntrustedInputTests` asserts that no `eval`,
+  validation; `tests/test_rules.py::RuleValidationTests` asserts that no `eval`,
   `exec`, `compile` or `__import__` exists anywhere in the rule or analysis
   packages.
 * Static file serving is restricted to `frontend/` with a `realpath` prefix

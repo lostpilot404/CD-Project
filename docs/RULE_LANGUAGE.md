@@ -286,9 +286,9 @@ records the sanitizer step and the reason it did not apply.
 
 | Behaviour | Test |
 | --- | --- |
-| Grammar, table build, conflicts | `tests/test_rules.py::RuleTableTests` |
-| Every validation code above | `tests/test_rules.py::ValidationTests` |
-| Declarative-only guarantee | `tests/test_rules.py::UntrustedInputTests` |
+| Grammar, table build, conflicts | `tests/test_rules.py::RuleGrammarTests` |
+| Every validation code above | `tests/test_rules.py::RuleValidationTests` |
+| Declarative-only guarantee | `tests/test_rules.py::RuleValidationTests` |
 | Built-in set contents and identity | `tests/test_rules.py::BuiltinRuleTests` |
 | Rules driving real findings | `tests/test_taint.py::RuleConfigurationTests`, `tests/test_workflow.py` |
-| Editor endpoint behaviour | `tests/test_api.py::RuleEndpointTests` |
+| Editor endpoint behaviour | `tests/test_api.py::RulesEndpointTests` |

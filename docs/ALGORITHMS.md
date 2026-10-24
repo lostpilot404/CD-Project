@@ -29,7 +29,8 @@ scan(source):
   token; identifiers are checked before keywords and keywords by table lookup.
 * **Diagnostics never abort the scan** — a bad escape or unsupported operator is
   recorded and scanning continues, so one mistake does not hide the rest.
-* Measured: 30 corpus files lex in the tens of microseconds each.
+* Measured: the 33 corpus files lex in well under a millisecond each
+  (0.08–0.25 ms, median ≈ 0.13 ms).
 
 ## 2. NULLABLE / FIRST / FOLLOW fixpoints
 
@@ -193,7 +194,7 @@ analyse(ast):
 * **Complexity:** O(ast nodes · scope depth) with dict lookups per scope.
 * **Symbol identity:** ids are allocated in declaration order, so the same name
   in two scopes yields two ids and never conflates two variables
-  (`tests/test_semantics.py::ScopeTests`).
+  (`tests/test_semantics.py::SymbolTableTests`).
 * **Measured:** semantic analysis of a 60-byte example is ≈ 0.09 ms.
 
 ## 9. CFG construction
@@ -350,8 +351,11 @@ build_graph(program):
 
 * **Complexity:** O(S · atoms) for the def-use lookup (bitset membership is O(1))
   plus O(S) for control edges from an AST walk.
-* **Measured:** 5–13 nodes and 2–15 edges across the 27 analysable corpus files
-  (largest: `interprocedural/recursion.ctc`); `scripts/audit.py` re-verifies
+* **Measured:** 3–13 nodes and 1–19 edges across the 30 analysable corpus files
+  (largest: `interprocedural/recursion.ctc`).  The count includes the
+  `source-to-sink` edges of the reported flows, so a file that reports a
+  finding carries more edges than its data/control graph alone;
+  `scripts/audit.py` re-verifies
   every intra-procedural data/taint edge of its own example against the reaching
   definitions (3 edges in that example, 0 unjustified) and fails if any edge
   cannot be justified.

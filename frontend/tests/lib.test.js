@@ -232,10 +232,10 @@ test('graph.js states when a graph is empty or too large', () => {
 test('graph.js legend describes every drawn edge kind', () => {
   const legend = renderLegend();
   const text = legend.textContent;
-  for (const kind of ['data', 'taint', 'control', 'call', 'return', 'sanitize', 'define']) {
+  for (const kind of ['data', 'taint', 'control', 'call', 'return', 'sanitize', 'define', 'source-to-sink']) {
     assert.ok(text.includes(kind), `legend mentions ${kind}`);
   }
-  assert.equal(EDGE_LEGEND.length, 7);
+  assert.equal(EDGE_LEGEND.length, 8);
 });
 
 test('views/statement.js renders the engine’s statement record, and nothing as markup', () => {
