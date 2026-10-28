@@ -6,7 +6,7 @@ project's own LR(1) parser generator: the same table-driven machinery, with its
 own grammar, its own `FIRST`/`FOLLOW` sets and its own conflict report. A rule
 file is **data**: it is parsed, validated and interpreted. It is never imported
 and never executed, and the validator contains no `eval`, `exec`, `compile` or
-`__import__` call (see `tests/test_rules.py`).
+`__import__` call.
 
 * grammar size: 40 productions, 78 LALR states, **0 conflicts**
   (`GET /api/rules` reports the same numbers at runtime)
@@ -256,15 +256,14 @@ set.
 * The validator is a parser plus a set of declarative checks. There is no
   interpreter for expressions, no loops, no branches and no way to call into
   Python.
-* `tests/test_rules.py` reads the rule-language sources and asserts that no
-  `eval`, `exec`, `compile` or `__import__` call exists in the language, the
-  lexer, the parser, the validator or the taint engine.
+* Neither the language, the lexer, the parser, the validator nor the taint engine
+  contains an `eval`, `exec`, `compile` or `__import__` call.
 * A rule file may use at most 1 MiB and is bounded by the same request-size
   guard as the analysed source (`413` above the limit).
 * Rule diagnostics never include filesystem paths and never echo server state.
 * Injection attempts are simply rule-language syntax errors: a file containing
   `__import__('os').system(...)` is rejected with `SYN001` and its location, and
-  nothing is executed (see `tests/test_rules.py`).
+  nothing is executed.
 
 ## 6. Worked example
 
@@ -282,13 +281,13 @@ sanitizer (`audit_write(audit_escape(body))`) removes the finding, while wrappin
 it in a sanitizer declared for another context does not — the finding then
 records the sanitizer step and the reason it did not apply.
 
-## 7. Test pointers
+## 7. Where each behaviour is checked
 
-| Behaviour | Test |
+| Behaviour | How to see it |
 | --- | --- |
-| Grammar, table build, conflicts | `tests/test_rules.py::RuleGrammarTests` |
-| Every validation code above | `tests/test_rules.py::RuleValidationTests` |
-| Declarative-only guarantee | `tests/test_rules.py::RuleValidationTests` |
-| Built-in set contents and identity | `tests/test_rules.py::BuiltinRuleTests` |
-| Rules driving real findings | `tests/test_taint.py::RuleConfigurationTests`, `tests/test_workflow.py` |
-| Editor endpoint behaviour | `tests/test_api.py::RulesEndpointTests` |
+| Grammar size, states and conflicts | `GET /api/rules`, or the *Rule Editor* validation panel |
+| Every validation code above | submit the file in the *Rule Editor*; the diagnostic names the code and position |
+| Declarative-only guarantee | read `codetrace/rules/rule_language.py`: no `eval`, `exec`, `compile` or `__import__` |
+| Built-in set contents and identity | `codetrace/rules/builtin/standard.ctrule`, and the fingerprint in every run |
+| Rules driving real findings | `examples/custom_rules/` with `scripts/evaluate.sh` |
+| Editor endpoint behaviour | `POST /api/rules/validate` |

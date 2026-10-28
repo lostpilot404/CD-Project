@@ -7,27 +7,13 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Python environments and caches
+# Python caches and environments
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 *.egg-info/
-.pytest_cache/
 
 # Runtime working directory: parser-table cache, exported reports, logs.
 # Nothing here is required to build or run the project.
 var/
-
-# The interface has no build step and no dependencies: the tests run on Node's
-# built-in test runner with a stub DOM.  These are ignored only because a stray
-# `npm install` would otherwise add files nobody needs.
-node_modules/
-package-lock.json
-
-# Local agent and tool caches
-.codegraph/
-.playwright-cli/
-.serena/
-codegraph.json
-*.bak*

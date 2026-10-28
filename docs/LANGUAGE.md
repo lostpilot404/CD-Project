@@ -192,7 +192,7 @@ comparison ``== != < <= > >=``, logical ``&& || !``, parentheses, assignment
 ``a[i]`` and function calls ``f(a, b)``.
 
 Operator precedence and associativity are encoded directly in the grammar
-(``docs/COMPILER_THEORY.md`` §2 shows the layers and how they are tested):
+(``docs/COMPILER_THEORY.md`` §2 shows the layers and the productions):
 
 ```
 assignment     right-associative
@@ -277,12 +277,12 @@ Every diagnostic carries ``code``, ``severity`` (``error`` / ``warning`` /
   condition;
 * ``CFG001`` unreachable code, ``DFA001`` variable may be used before assignment.
 
-## 7. Test pointers
+## 7. Where each rule can be seen
 
-| Behaviour | Test |
+| Behaviour | Example or view |
 | --- | --- |
-| Tokenisation, offsets, comments, literals | ``tests/test_lexer.py`` |
-| Precedence, associativity, nesting, recovery, diagnostics | ``tests/test_parser.py`` |
-| Scopes, shadowing, symbol identity, type checks | ``tests/test_semantics.py`` |
-| Unsupported constructs from this document | ``tests/test_lexer.py``, ``examples/unsupported/`` |
-| Running every bundled example through the real pipeline | ``evaluation/run_evaluation.py`` |
+| Tokenisation, offsets, comments, literals | `examples/safe/constant_command.ctc`, *Analyze Code* |
+| Precedence, associativity, nesting, recovery, diagnostics | `examples/syntax_errors/`, *Analyze Code* |
+| Scopes, shadowing, symbol identity, type checks | `examples/challenges/shadowed_variable.ctc` |
+| Unsupported constructs from this document | `examples/unsupported/`, *Documentation* view |
+| Every bundled example through the real pipeline | `evaluation/run_evaluation.py` |

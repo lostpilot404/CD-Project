@@ -6,7 +6,7 @@ Two different questions are answered here:
 2. **what the tool itself does to stay safe** while handling untrusted input.
 
 Nothing in this document is aspirational: each paragraph describes behaviour you
-can check in this checkout, and the tests that pin it are named.
+can check in this checkout.
 
 ---
 
@@ -49,8 +49,7 @@ Consequences worth stating plainly:
   undeclared identifier `SEM001`, a wrong argument count `SEM009`, or a type
   mismatch `SEM005`/`SEM010`) would not compile under C rules. The run is marked
   partial (`analysis_complete: false`, reason "semantic error(s) were
-  reported"), because the names or values involved could not be resolved. Pinned
-  by `SymbolTableTests.test_undeclared_identifier_makes_the_run_partial` (`tests/test_semantics.py`).
+  reported"), because the names or values involved could not be resolved.
   Warnings such as shadowing (`SEM018`) do not make a run partial.
 
 ### 1.3 Analysis approximations
@@ -99,10 +98,9 @@ whoever uses the app. The design assumption is that **both are data**.
 
 * The pipeline is parsers and analyses only: no `eval`, `exec`, `compile`,
   `__import__`, `subprocess`, `os.system` or dynamic import anywhere in
-  `codetrace/` (asserted by `tests/test_rules.py::RuleValidationTests`, which
-  scans the package sources).
+  `codetrace/`.
 * Uploading a program that would create a canary file when run leaves the file
-  absent — checked by `tests/test_api.py` and `scripts/audit.py`.
+  absent, because nothing executes it.
 * Nothing writes the analysed source to disk: it lives in memory for the
   lifetime of the run.
 
@@ -139,8 +137,8 @@ filename to read.
 
 Every error uses one envelope
 (`{"error": {"code", "message", "detail"}}`) and never contains a stack trace, a
-filesystem path or environment content — `tests/test_api.py::ValidationAndErrorTests`
-asserts the absence of `Traceback` and `/home/` in every error body. The JSON and
+filesystem path or environment content: no error body carries a `Traceback` or a
+host path. The JSON and
 HTML reports contain the analysed source (which the requester supplied) and the
 filename as given, escaped for HTML.
 
@@ -148,9 +146,8 @@ filename as given, escaped for HTML.
 
 There is no supply chain to attack: the project has **zero third-party runtime
 dependencies** (Python 3.11 standard library only) and the frontend is vanilla ES
-modules with no bundler and no npm runtime packages. Tests use `unittest` and
-Node's built-in test runner. Nothing calls a remote service, and no credential,
-API key or paid account is required at any point.
+modules with no bundler and no npm packages. Nothing calls a remote service, and no
+credential, API key or paid account is required at any point.
 
 ### 2.7 Deployment assumptions
 
@@ -158,7 +155,7 @@ The server binds `0.0.0.0` by default so the sandbox preview can reach it, and i
 has **no authentication**. It is meant to run locally, on the user's own machine
 or in a container, for one user at a time. Before exposing it to a network, add
 an authenticating reverse proxy; running it on the public internet as-is is
-outside the intended use and outside what the project tests.
+outside the intended use.
 
 ### 2.8 What the tool does not protect against
 

@@ -9,7 +9,7 @@ import { el, render } from '../lib/dom.js';
 const DOCUMENTS = [
   ['README.md', 'project overview, quick start, repository layout'],
   ['docs/TECHNICAL_DESIGN.md', 'architecture, module responsibilities, data flow through the engine'],
-  ['docs/COMPILER_THEORY.md', 'every compiler concept used, with equations, worked examples and test pointers'],
+  ['docs/COMPILER_THEORY.md', 'every compiler concept used, with the equations and worked examples'],
   ['docs/ALGORITHMS.md', 'pseudocode and complexity of each algorithm'],
   ['docs/LANGUAGE.md', 'the CT-C subset: grammar, types, statements, unsupported constructs'],
   ['docs/RULE_LANGUAGE.md', 'the declarative rule language and its grammar'],
@@ -18,9 +18,9 @@ const DOCUMENTS = [
   ['docs/EVALUATION.md', 'how the labelled corpus was built and what the measured numbers mean'],
   ['docs/LIMITATIONS.md', 'what the tool does not do, and the threat model of the tool itself'],
   ['docs/USER_GUIDE.md', 'running the app, using the interface, reading findings'],
-  ['docs/PRESENTATION.md', 'presentation outline and viva questions'],
-  ['docs/CodeTrace_Project_Report.md', 'editable source of the project report, including verification evidence'],
-  ['docs/CodeTrace_Project_Report.pdf', 'the finished BCSE307P project report'],
+  ['docs/Review3_CodeTrace_Report.docx', 'the BCSE307P project report, Review 3'],
+  ['docs/Review3_CodeTrace_Report_preview.pdf', 'the same report as a PDF'],
+  ['docs/screenshots/', 'screen captures of every view, taken from the running system'],
 ];
 
 export function renderDocs(container, { language, grammar }) {
