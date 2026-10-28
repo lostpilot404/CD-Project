@@ -53,16 +53,16 @@ itself. `python3 -m codetrace.api` is the whole deployment.
 | `codetrace/api` | 4 | 1152 | HTTP server, routing, request validation, limits, schemas catalogue, `python3 -m` entry point |
 | `codetrace/*.py` | 2 | 22 | version constants and the package docstring |
 | `tests/` | 18 | 6212 | lexer, parser, semantics, CFG, data flow, taint, slicing, rules, API, reporting, end-to-end workflow, audit and mutation-check self-tests |
-| `frontend/` | 21 | 4331 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
+| `frontend/` | 21 | 4350 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
 | `frontend/tests/` | 5 | 2115 | stub DOM, harness, library tests, view tests against a real engine |
 | `evaluation/` | 2 | 754 | labelled corpus harness and `expectations.json` |
-| `scripts/` | 11 | 5883 | dev server, full test run, corpus evaluation, independent audit, mutation check, project-report and Review 2 report builders |
+| `scripts/` | 16 | 9232 | dev server, full test run, corpus evaluation, independent audit, mutation check, screenshot capture and trimming, project-report, Review 2 and Review 3 report builders |
 | `docs/` | 13 | 4050 | Markdown documentation and editable project-report source (see `README.md`) |
 | `examples/` | 34 | 307 | 33 labelled `.ctc` sources and one example rule file |
 
 Total implementation: 12 834 lines of Python in `codetrace/` (39 files), 6 212
-lines of engine tests, 6 446 lines of frontend assets (of which 2 115 are the
-interface tests), 5 883 lines of scripts and 4 050 lines of documentation.
+lines of engine tests, 6 465 lines of frontend assets (of which 2 115 are the
+interface tests), 9 232 lines of scripts and 4 050 lines of documentation.
 Counted with `wc -l`-style line counts, which include blank lines and comments.
 Documentation counts cover Markdown sources, not the generated PDF.
 The table is **checked**: `python3 scripts/audit.py` re-derives every row from

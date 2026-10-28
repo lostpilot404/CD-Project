@@ -446,7 +446,7 @@ code, kbd, pre, .mono {
 }
 
 .grid--stats {
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   margin-bottom: 1.25rem;
 }
 
@@ -473,6 +473,11 @@ code, kbd, pre, .mono {
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
   color: var(--text);
+}
+
+.stat__value--long {
+  font-size: 0.98rem;
+  line-height: 1.45;
 }
 
 .stat__label {
@@ -674,6 +679,13 @@ code, kbd, pre, .mono {
   font-size: 0.85rem;
   margin: 0.5rem 0;
   font-weight: 500;
+  /* an alert raised inside the status line must wrap inside its column, not spill over it */
+  min-width: 0;
+}
+
+.status > .alert {
+  margin-bottom: 0;
+  overflow-wrap: anywhere;
 }
 .status[data-state="error"] { color: var(--critical); font-weight: 600; }
 .status[data-state="ok"] { color: var(--ok); }

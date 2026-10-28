@@ -103,6 +103,8 @@ docs/                  the documentation set (below)
 | `docs/CodeTrace_Project_Report.pdf` | the finished BCSE307P project report |
 | `docs/REVIEW_2_REPORT.md` | Review 2 deliverables: features added, work-file map, module reference, measured results |
 | `docs/Review2_CodeTrace_Report.docx` | Review 2 report on the BCSE307P template: features with screenshots, GitHub link, contents page, work-file explanation and module-wise reference |
+| `docs/Review3_CodeTrace_Report.docx` | Review 3 report on the same template: plain black headings, contents with figure and table lists, 16 screenshots of the running system, work-file and module reference, verification and evaluation results |
+| `docs/review3_screenshots/` | the Review 3 captures, taken from a running server by `scripts/capture_screenshots.js` |
 
 The Documentation page inside the application serves the same facts from the
 engine itself (language mode, grammar statistics, diagnostic catalogue, rule
@@ -133,6 +135,31 @@ python3 scripts/make_review2_figures.py                 # diagrams and logo
 python3 scripts/build_review2_docx.py                   # -> docs/Review2_CodeTrace_Report.docx
 python3 scripts/build_review2_docx.py --page-map map.json   # contents page from measured pages
 ```
+
+### Rebuild the Review 3 report (optional)
+
+`docs/Review3_CodeTrace_Report.docx` follows the same template and the same split:
+`scripts/build_review3_docx.py` holds the layout (chapter headings 18 pt, sections
+16 pt, sub-sections 14 pt, body and tables 12 pt, all in black), and
+`scripts/review3_content.py` holds the wording. The screenshots are captured from a
+running server, so start one first; the capture script writes into
+`docs/review3_screenshots/`, and `scripts/trim_screenshots.py` crops the empty tail
+from a capture and scales it to the resolution the page needs.
+
+```bash
+python3 -m codetrace.api --port 8000 &                  # the server the capture reads
+python3 scripts/capture_screenshots.js                  # -> docs/review3_screenshots/*.png
+python3 scripts/trim_screenshots.py                     # crop and scale the captures
+python3 scripts/build_review3_docx.py                   # -> docs/Review3_CodeTrace_Report.docx
+python3 scripts/build_review3_docx.py --page-map map.json   # contents from measured pages
+```
+
+The build needs `python-docx`, `reportlab` (text metrics) and `Pillow`; the capture
+needs `puppeteer-core` and a Chromium binary. Running the application and its tests
+needs none of them. Page numbers in the contents and in the lists of figures and
+tables are measured, not typed: the builder lays the body out with the metrics Word
+uses for Times New Roman, and `--page-map` replaces the estimates with the pages of
+a rendered proof.
 
 Every number in that report is measured from this tree: the file and line counts
 of Chapter 4.2 and 4.7 come from the files themselves, the parser-table numbers
