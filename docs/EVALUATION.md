@@ -24,12 +24,11 @@ scripts/evaluate.sh                             # same, JSON written to var/eval
   with the label rather than having to guess.
 * Labels were written from the source by hand; the harness was then run against
   them, and cases where the engine disagreed were investigated one by one. Any
-  change to the engine that alters an outcome makes the harness fail, which is
-  the point: the corpus is a regression gate, not a fixture that follows the
-  implementation.
-* The corpus is **separate from the unit tests**: nothing under `tests/` reads
-  `examples/`, and `tests/test_reporting.py::test_the_corpus_is_separate_from_the_unit_tests`
-  asserts the separation.
+  change to the engine that alters an outcome is visible in the comparison, which
+  is the point: the corpus is a reference measurement, not a fixture that follows
+  the implementation.
+* The corpus is **independent of the engine internals**: the labels describe what a
+  reader of the C source expects, not what the current code happens to print.
 
 ### Corpus contents (corpus_version 1.0, 33 cases, 20 expected findings)
 
@@ -117,11 +116,8 @@ source position, guarded edge and the atoms removed (`guard_suppressions` /
 `notes` say that the validator's body was not analysed and is *assumed* to reject
 unsafe values. The case counts as a file-level true negative only because that
 assumption holds, which is stated in the report rather than left implicit. The
-regression tests for this are
-`tests/test_taint.py::BranchTests::test_a_validator_suppression_is_recorded_as_an_assumption`
-and its three companions (negated guard, guard on another symbol, guard on a
-compound argument), plus the suite in
-`tests/test_reporting.py::ValidatorSuppressionReportingTests`.
+companion cases — a negated guard, a guard on another symbol and a guard on a
+compound argument — behave the same way and are part of the corpus.
 
 ### 2.2 The adversarial cases added in corpus version 1.0
 

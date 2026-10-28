@@ -351,7 +351,7 @@ function wireInputs() {
       const status = view.querySelector('#analyze-status');
       if (status) {
         if (isDirty) {
-          render(status, el('span', {
+          render(status, el('div', {
             class: 'alert alert--warn',
             text: 'The results below are for the text that was submitted. The editor has been changed since then — run the analysis again to analyse the current text.',
           }));
@@ -398,7 +398,7 @@ function wireInputs() {
       refresh('analyze');
       if (dirty) {
         const status = view.querySelector('#analyze-status');
-        render(status, el('span', {
+        render(status, el('div', {
           class: 'alert alert--info',
           text: 'The results below are for the text that was submitted. The editor has been changed since then — run the analysis again to analyse the current text.',
         }));

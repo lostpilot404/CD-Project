@@ -2,10 +2,10 @@
  * Filtering, searching and sorting of findings.
  *
  * These functions are pure: they take the finding objects the API returns and
- * return new arrays.  Keeping them out of the views makes them testable without
- * a browser (see frontend/tests/) and keeps the taint/dependency reasoning in
- * the engine where it belongs -- nothing here recomputes analysis results, it
- * only selects and orders what the engine reported.
+ * return new arrays.  Keeping them out of the views keeps the taint and
+ * dependency reasoning in the engine where it belongs -- nothing here
+ * recomputes analysis results, it only selects and orders what the engine
+ * reported.
  */
 
 export const SEVERITY_ORDER = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4 };

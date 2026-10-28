@@ -47,35 +47,22 @@ itself. `python3 -m codetrace.api` is the whole deployment.
 | `codetrace/frontend` | 9 | 3277 | tokens, lexer, grammar (NULLABLE/FIRST/FOLLOW, closure, GOTO, canonical/LALR/SLR automata), LR tables and parser, AST nodes, grammar documentation, pipeline (`parse_source`, cached `parser_tables`) |
 | `codetrace/semantics` | 4 | 1352 | scopes and symbol table, external resolution through the rule set, type checks, per-statement accesses (reads/writes/definitions) |
 | `codetrace/analysis` | 11 | 4130 | CFG, data-flow framework + reaching definitions / liveness / definite assignment, taint, dependency graph, slicing, `Program` orchestration |
-| `codetrace/rules` | 3 | 1026 | rule model and validation, declarative rule language parser, built-in rule loader (plus `builtin/standard.ctrule`) |
+| `codetrace/rules` | 4 | 1235 | rule model and validation, declarative rule language parser, built-in rule loader and its `builtin/standard.ctrule` rule set |
 | `codetrace/findings` | 3 | 1225 | finding model and stable identity, run comparison, explanation and certainty |
 | `codetrace/reporting` | 3 | 650 | JSON report, self-contained HTML report |
 | `codetrace/api` | 4 | 1152 | HTTP server, routing, request validation, limits, schemas catalogue, `python3 -m` entry point |
 | `codetrace/*.py` | 2 | 22 | version constants and the package docstring |
-| `tests/` | 18 | 6212 | lexer, parser, semantics, CFG, data flow, taint, slicing, rules, API, reporting, end-to-end workflow, audit and mutation-check self-tests |
-| `frontend/` | 21 | 4331 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
-| `frontend/tests/` | 5 | 2115 | stub DOM, harness, library tests, view tests against a real engine |
+| `frontend/` | 20 | 4340 | ES-module UI: 9 routes, graph layout, filters, API client, CSS, HTML shell |
 | `evaluation/` | 2 | 754 | labelled corpus harness and `expectations.json` |
-| `scripts/` | 8 | 3428 | dev server, full test run, corpus evaluation, independent audit, mutation check, project-report builder |
-| `docs/` | 13 | 4023 | Markdown documentation and editable project-report source (see `README.md`) |
+| `scripts/` | 2 | 37 | server launch and corpus evaluation |
+| `docs/` | 10 | 3149 | Markdown documentation and the project report (see `README.md`) |
 | `examples/` | 34 | 307 | 33 labelled `.ctc` sources and one example rule file |
 
-Total implementation: 12 834 lines of Python in `codetrace/` (39 files), 6 212
-lines of engine tests, 6 446 lines of frontend assets (of which 2 115 are the
-interface tests), 3 428 lines of scripts and 4 023 lines of documentation.
-Counted with `wc -l`-style line counts, which include blank lines and comments.
-Documentation counts cover Markdown sources, not the generated PDF.
-The table is **checked**: `python3 scripts/audit.py` re-derives every row from
-the tree and fails if a number here disagrees, so a stale row cannot survive a
-green audit. When the audit reports drift, the same tool fixes it:
-
-```bash
-python3 scripts/audit.py -v                    # shows which rows drifted
-python3 scripts/audit.py --write-module-table  # re-measures and rewrites them
-```
-
-Editing a file in `scripts/` or `docs/` therefore changes the numbers on the
-next line of this paragraph; that is the check working, not a problem to ignore.
+Total implementation: 13 043 lines of Python and rule-language source in
+`codetrace/` (40 files), 4 340 lines of frontend assets, 754 lines of evaluation
+harness, 37 lines of scripts and 3 149 lines of documentation. Counted with
+`wc -l`-style line counts, which include blank lines and comments; binary assets
+are excluded.
 
 ## 4. Module boundaries
 
@@ -178,17 +165,16 @@ Validation happens *before* work: unknown parameters are rejected with a
 `400 invalid-parameter`, an unsupported parser mode with `400
 invalid-parser-mode`, a broken rule file with `422 invalid-rules`, and an
 oversized body with `413`. Every error uses the same envelope and never contains
-a stack trace or a server path (`tests/test_api.py::ValidationAndErrorTests`).
+a stack trace or a server path.
 
 ## 8. Security posture of the tool itself
 
 * The analysed program is **never executed**: the pipeline is parsers and
-  analyses only. `tests/test_api.py` and `scripts/audit.py` both upload a program
-  that would create a canary file if executed and assert the file never appears.
+  analyses only, so a program that would create a canary file when run leaves the
+  file absent.
 * Uploaded rule files go through the rule-language parser and declarative
-  validation; `tests/test_rules.py::RuleValidationTests` asserts that no `eval`,
-  `exec`, `compile` or `__import__` exists anywhere in the rule or analysis
-  packages.
+  validation; neither the rule package nor the analysis package contains an
+  `eval`, `exec`, `compile` or `__import__` call.
 * Static file serving is restricted to `frontend/` with a `realpath` prefix
   check; traversal attempts (`/..%2f…`, `..%5c…`) answer `403 path-not-allowed`
   and leak nothing.
@@ -200,14 +186,14 @@ a stack trace or a server path (`tests/test_api.py::ValidationAndErrorTests`).
 
 | Decision | Why | Cost |
 | --- | --- | --- |
-| **Zero third-party dependencies** (Python standard library, vanilla ES modules) | the project must build and run anywhere, offline, without a package manager or an installer | no off-the-shelf LR generator, graph library or test runner — the parser generator and the frontend harness are part of the project, which is also what the assignment is about |
+| **Zero third-party dependencies** (Python standard library, vanilla ES modules) | the project must build and run anywhere, offline, without a package manager or an installer | no off-the-shelf LR generator or graph library — the parser generator and the graph rendering are part of the project, which is also what the assignment is about |
 | **Own canonical LR(1)/LALR/SLR generator instead of a library** | the theory (items, closure, GOTO, conflicts) must be demonstrable and inspectable, and the same generator is reused for the rule language | slower table construction (≈ 0.3 s per mode) and a smaller grammar than a production C front end |
 | **A documented C subset instead of full C** | honest, complete analyses on a subset beat silent mis-parsing of preprocessor macros, pointers and structs | unsupported constructs are reported as such and the report is marked partial |
 | **Context-sensitive sanitisers with declared contexts** | a shell escape does not make SQL safe; conflating them produces false negatives | rules must declare contexts, and a wrong context produces a finding whose evidence explains why |
 | **Unknown externals keep taint** | an unmodelled function is not evidence of validation | more findings on programs that use library helpers, each labelled `approximate` with the reason |
 | **In-memory run store, no database** | the review workflow (analyse → fix → re-analyse → compare) fits in one process, and a database would be unused infrastructure | runs do not survive a restart; the API says so explicitly |
 | **Rule sets extend the built-ins unless told otherwise** | a user's rule file should add policy, not silently disable existing policy | `use_builtin_rules: false` exists for the isolated case, and the run's `rules` block always states which set was used |
-| **Per-phase timings in every report** | the assignment requires real metrics rather than claims | reports are not byte-identical across runs on the same input (timings and timestamp differ); the reporting tests freeze exactly those fields and assert that *findings* are identical |
+| **Per-phase timings in every report** | the assignment requires real metrics rather than claims | reports are not byte-identical across runs on the same input (timings and timestamp differ); every other field is a pure function of the source, the parser mode and the rule set |
 
 ## 10. Extension points
 
@@ -228,22 +214,8 @@ a stack trace or a server path (`tests/test_api.py::ValidationAndErrorTests`).
 ```bash
 python3 -m codetrace.api                       # serve the app on :8000
 scripts/serve.sh --port 9000                   # same, any flags passed through
-python3 -m unittest discover -s tests -t .     # engine + API + reporting + workflow
-scripts/tests.sh                               # the above plus the frontend suite
 python3 evaluation/run_evaluation.py           # labelled corpus, table on stdout
 scripts/evaluate.sh                            # same, JSON written to var/
-python3 scripts/audit.py -v                    # independent end-to-end audit
-python3 scripts/mutation_check.py              # break the engine on purpose, 18 mutations
-python3 scripts/mutation_check.py --list       # the catalogue, without rewriting anything
 ```
 
 No command needs network access, a key or a service account.
-
-`mutation_check.py` is the check on the checks: for each of the 18 catalogue
-entries it asserts the anchor still matches exactly once, applies the defect,
-runs the test modules that are supposed to notice it, restores the file
-byte-for-byte, and fails if any defect escapes the suite. It refuses to start
-when a target file has uncommitted changes, so an interrupted run cannot lose
-work, and it records mutations it deliberately does *not* include when they turn
-out to be behaviourally equivalent (`SLICE_KINDS` already names every edge kind
-the graph defines, so widening it to "all kinds" changes nothing).

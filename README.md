@@ -1,148 +1,139 @@
 # CodeTrace
 
-**A compiler-driven program dependency and vulnerability analysis platform.**
+**A compiler-driven program and security analysis platform for a C subset.**
 
-CodeTrace lexes and parses a small C subset with its own canonical LR(1) parser
-generator, builds an abstract syntax tree and symbol tables, constructs a
-control-flow graph, runs reusable data-flow analyses (reaching definitions,
-liveness, definite assignment), propagates taint from configurable sources to
-configurable sinks, builds a typed program dependency graph, computes program
-slices, and reports each finding with the evidence that justifies it — through a
-browser interface and an HTTP API.
+CodeTrace reads a program written in CT-C, a documented subset of C, and reports the
+security-relevant data flows in it. The analysis is built on the classical phases of a
+compiler rather than on pattern matching: a hand-written scanner produces tokens with
+source positions, an LR parser generator written for the project builds SLR(1), LALR(1)
+or canonical LR(1) tables for the grammar, and a scoped semantic analyser resolves
+declarations and gives every definition a stable identity. Control-flow graphs, a
+worklist data-flow framework, taint propagation over a declarative rule set, a typed
+program dependency graph and program slices are built on that output, and each finding
+carries the path that produced it.
 
-It is written in Python 3.11 using **only the standard library**, plus a frontend
-of plain ES modules with no build step and no npm dependencies. There is nothing
-to install, no API key, no cloud service and no network access at run time.
+The engine is Python 3.11 using **only the standard library**. The interface is plain
+HTML, CSS and ECMAScript modules with no build step and no dependencies. There is
+nothing to install, no service to reach and no network access at run time.
 
-The analysed program is **never executed**. CodeTrace is a static analysis tool:
-it reads the file you give it as data and reports *potential* flows. A short
-finding list means "no configured source-to-sink flow was detected for this file,
-this rule set and this engine version" — never "this program is safe".
+The analysed program is **never executed**. CodeTrace is a static analysis tool: it
+reads the file as data and reports *potential* flows. An empty finding list means
+"no configured source-to-sink flow was found for this file, this rule set and this
+engine version", never "this program is safe".
 
 ## Quick start
 
 ```bash
-python3 -m codetrace.api                # http://0.0.0.0:8000
-scripts/serve.sh --port 9000            # the same server, any port
+python3 -m codetrace.api              # http://0.0.0.0:8000
+scripts/serve.sh --port 9000          # the same server, any port
 ```
 
-Then open `http://localhost:8000`, go to **Analyze Code**, press
-*Load example…*, pick `vulnerable/command_injection.ctc` and press *Run
-analysis*. Start with `docs/USER_GUIDE.md` if you want the guided tour.
+Open `http://localhost:8000`, go to **Analyze Code**, press *Load example…*, choose
+`vulnerable/command_injection.ctc`, and press *Run analysis*. The run is then available
+in every view: Overview, Findings, Program Graph, Data-Flow Analysis, Program Slicing,
+Rule Editor, Reports and Documentation. `docs/USER_GUIDE.md` is the guided tour.
 
-No third-party package is needed to run the application or its analysis pipeline:
-Python 3.11+ is enough. Node.js 18+ and npm are needed only for the frontend tests.
-The optional PDF report builder has a separate build-time dependency (see below).
+The labelled corpus is evaluated with:
 
 ```bash
-scripts/tests.sh                 # every suite: engine, API, reporting, workflow, interface
-scripts/tests.sh engine          # Python suites only (no Node needed)
-scripts/evaluate.sh              # the labelled corpus, JSON evidence in var/
-python3 scripts/audit.py         # independent Definition-of-Done audit (69 checks)
-python3 scripts/audit.py -v      # ... printing the value behind every check
-python3 scripts/audit.py --write-module-table   # refresh the measured module table
-python3 scripts/mutation_check.py  # break the engine on purpose: does the suite notice?
-python3 scripts/mutation_check.py --list   # the mutation catalogue, no changes made
+scripts/evaluate.sh                   # table on stdout, JSON evidence in var/
 ```
 
 ## What it does
 
 | Stage | What is produced |
 | --- | --- |
-| Lexer | tokens with type, value, offset and line:column; comments skipped; literals (including `\xHH`) and every lexical error reported with a code |
-| Parser | canonical LR(1) / LALR(1) / SLR(1) tables built from the grammar, one state is one table row; parse tree with source spans; located syntax diagnostics and recovery |
+| Lexer | tokens with type, value, offset and line:column; comments skipped; literals (including `\xHH`); every lexical error carrying a code |
+| Parser | SLR(1), LALR(1) or canonical LR(1) tables built from the grammar, one state per table row; syntax tree with source spans; located diagnostics and recovery |
 | AST | one node class per construct, every node carrying its source range |
-| Semantics | scoped symbol tables with stable symbol ids, shadowing, duplicate/undeclared/arity/type diagnostics, explicit "unsupported construct" reporting |
-| CFG | per-function basic blocks with stable ids, typed edges (true/false/loop-back/return/…), loop headers with back edges, reachability computed, not guessed |
-| Data-flow | a reusable worklist framework (direction, domain, boundary, transfer, meet, iteration caps) with reaching definitions, liveness and definite assignment, all bit-vector based |
-| Taint | sources, sinks, sanitizers and validators declared by rules with contexts; atoms like `src:stdin@command`; context-sensitive sanitizers; interprocedural summaries with documented approximations |
-| Dependencies | typed edges (data, control, call, return, taint, sanitize, define, source-to-sink) — every edge carries the reason it exists |
-| Slicing | backward, forward and finding-focused slices with the reason each statement is in the slice |
-| Findings | stable id, rule id, category, severity, certainty, source/sink locations, the path, branch conditions, sanitizers seen, why it matched, limitations, remediation |
-| Reports | stable JSON report (documented in `docs/REPORT_SCHEMA.md`) and a self-contained HTML report that escapes all analysed text |
-| Rules | a declarative rule language parsed by the same LR machinery, validated with `line:col` diagnostics before it is ever used |
+| Semantics | scoped symbol tables with stable symbol identities, shadowing, duplicate/undeclared/arity/type diagnostics, explicit "unsupported construct" reporting |
+| CFG | per-function basic blocks with stable ids, typed edges (true/false/loop-back/return), loop headers with back edges, computed reachability |
+| Data-flow | a worklist framework (direction, domain, boundary, transfer, meet, iteration caps) with reaching definitions, liveness and definite assignment |
+| Taint | sources, sinks, sanitisers and validators declared by rules with contexts; context-sensitive sanitisers; interprocedural summaries with documented approximations |
+| Dependencies | typed edges (data, control, call, return, taint, sanitise, define, source-to-sink), each carrying the reason it exists |
+| Slicing | backward, forward and finding-focused slices, with the reason each statement belongs |
+| Findings | stable identity, severity, category, certainty, ordered evidence path, remediation |
+| Reports | schema-versioned JSON and a self-contained HTML document; two runs can be compared finding by finding |
+| API | JSON over HTTP for analysis, rules, grammar, documentation, slices and reports |
 
 ## Repository layout
 
 ```
-codetrace/             engine (Python, standard library only)
-  frontend/            lexer, grammar, canonical LR(1) generator, AST, parser tables
-  semantics/           scopes, symbols, types, semantic diagnostics
-  analysis/            CFG, data-flow framework, reaching definitions, liveness,
-                       definite assignment, taint, dependency graph, slicing, pipeline
-  rules/               rule model, rule language, built-in rule file
-  findings/            finding model, comparison of runs, explanation builder
-  reporting/           JSON and HTML reports
-  api/                 HTTP server, request schemas, error envelope
-frontend/              interface: index.html, css, ES modules (no build step, no deps)
-frontend/tests/        interface tests against a real engine (Node test runner)
-tests/                 engine suite: lexer, parser, semantics, CFG, data-flow,
-                       taint, slicing, rules, API, reporting, end-to-end workflow
-examples/              33 labelled `.ctc` files and one example rule file
-evaluation/            harness + `expectations.json` labels for the corpus
-scripts/               server, test, evaluation, audit, mutation and report-building tools
-docs/                  the documentation set (below)
+codetrace/            the engine
+  frontend/           scanner, grammar, LR automata and tables, parser, syntax tree
+  semantics/          scopes, symbol identities, type and declaration checks
+  rules/              rule grammar, parser, validator, built-in rule file
+  analysis/           control-flow graphs, data-flow framework, taint, dependencies, slices
+  findings/           finding model and evidence paths
+  reporting/          JSON and HTML report builders
+  api/                HTTP server and request/response schemas
+frontend/             the workbench: nine views, SVG graph renderer, styles, HTML shell
+examples/             the CT-C programs used by the example picker and the corpus
+evaluation/           labels for the corpus and the harness that runs it
+docs/                 design and reference documentation, screenshots, the project report
+scripts/              server launch and corpus evaluation
 ```
+
+## Usage
+
+```bash
+python3 -m codetrace.api --port 9000 --host 0.0.0.0
+python3 evaluation/run_evaluation.py --json var/evaluation.json
+```
+
+The API accepts a program, a parser mode (`slr`, `lalr` or `canonical`) and an optional
+rule file, and returns the run: diagnostics, statements, control-flow graphs, data-flow
+facts, dependency graph, slices and findings. It is documented in `docs/API.md`, and
+the exported report format in `docs/REPORT_SCHEMA.md`.
+
+Security knowledge is data, not code. A rule file declares sources, sinks, sanitisers
+and validators with the external functions they correspond to, the argument positions,
+the contexts in which they apply and, for sinks, a category and a severity. Rule files
+are parsed by the same LR machinery as the analysed language and validated before use;
+nothing in a rule file can execute, import or write. The built-in set declares five
+sources, eight sinks, five sanitisers, two validators and four flows, and is identified
+by a fingerprint that appears in every run.
+
+## Results
+
+The engine is evaluated against a corpus of thirty-three CT-C programs with
+hand-written labels — twenty expected findings across seventeen vulnerable programs,
+one program that exercises a submitted rule file, five safe programs, four sanitised
+ones, and six programs that must be rejected with a specific diagnostic because they
+use a construct outside the language. All twenty expected findings are reported with
+the expected rule, category and severity; there is no false positive and no false
+negative on this corpus. `docs/EVALUATION.md` explains what these numbers do and do not
+mean.
 
 ## Documentation
 
 | Document | Contents |
 | --- | --- |
-| `docs/USER_GUIDE.md` | running the app, the nine pages, reading a finding, the fix-and-recheck loop, troubleshooting |
-| `docs/LANGUAGE.md` | the CT-C subset: tokens, grammar, types, statements, every diagnostic code |
-| `docs/RULE_LANGUAGE.md` | the declarative rule language: grammar, attributes, validation rules, examples |
-| `docs/COMPILER_THEORY.md` | every compiler concept used, with definitions, equations, worked examples and pointers to the code and tests |
-| `docs/ALGORITHMS.md` | pseudocode and complexity for each algorithm, plus measured timings |
-| `docs/TECHNICAL_DESIGN.md` | architecture, module responsibilities, data flow through the engine, design decisions |
-| `docs/API.md` | every endpoint, request/response schema, error envelope, limits, `curl` examples |
-| `docs/REPORT_SCHEMA.md` | the exported report: keys, finding fields, path steps, stability rules |
-| `docs/LIMITATIONS.md` | what the analysis does not do, per finding, and the threat model of the tool itself |
+| `docs/USER_GUIDE.md` | installing nothing, running the app, using each view, reading a finding |
+| `docs/LANGUAGE.md` | the CT-C subset: types, statements, expressions, unsupported constructs |
+| `docs/RULE_LANGUAGE.md` | the declarative rule language, its grammar and its diagnostics |
+| `docs/TECHNICAL_DESIGN.md` | architecture, module responsibilities, the path of one analysis |
+| `docs/COMPILER_THEORY.md` | every compiler concept used, with the equations and worked examples |
+| `docs/ALGORITHMS.md` | pseudocode and complexity of each algorithm |
+| `docs/API.md` | endpoints, request and response schemas, limits |
+| `docs/REPORT_SCHEMA.md` | the exported report: keys, finding fields, path steps, stability |
 | `docs/EVALUATION.md` | how the labelled corpus was built and what the measured numbers mean |
-| `docs/PRESENTATION.md` | talk outline, demo script and viva questions |
-| `docs/CodeTrace_Project_Report.md` | editable source of the project report, including verification evidence |
-| `docs/CodeTrace_Project_Report.pdf` | the finished BCSE307P project report |
+| `docs/LIMITATIONS.md` | what the tool does not do, and the threat model of the tool itself |
 
-The Documentation page inside the application serves the same facts from the
-engine itself (language mode, grammar statistics, diagnostic catalogue, rule
-language), so the interface cannot claim more than the engine implements.
+## The project report
 
-### Rebuild the project report (optional)
+`docs/Review3_CodeTrace_Report.docx` is the BCSE307P project report (Review 3), with
+`docs/Review3_CodeTrace_Report_preview.pdf` as a rendered copy. It describes the
+architecture, the compiler phases, the module-wise mapping to the course, a worked
+example and the features added in this review, with screenshots taken from the running
+system in `docs/screenshots/`.
 
-The finished PDF, its Markdown source and `scripts/build_project_report.py`
-are kept together as the current project deliverable. Only rebuilding the PDF
-needs ReportLab; running the application and its tests does not.
+## Scope and limitations
 
-```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install reportlab==5.0.1
-.venv/bin/python scripts/build_project_report.py --check
-```
-
-Keep generated analysis reports, evaluation JSON, screenshots, logs and scratch
-probes under the ignored `var/` directory. The project-report PDF in `docs/`
-is the intentional exception; local environments and caches are also ignored.
-
-## Verification
-
-| Suite | Command | Result on this checkout |
-| --- | --- | --- |
-| Engine, API, reporting, workflow | `python3 -m unittest discover -s tests -t .` | 350 tests, all passing |
-| Interface | `cd frontend && npm test` | 53 tests, all passing (real engine over HTTP, stub DOM) |
-| Labelled corpus | `scripts/evaluate.sh` | 33 files, 20 expected findings, TP 20 / FP 0 / FN 0, file-level TN 9/9, precision = recall = F1 = 1.0, ≈1.2 s total |
-| Independent audit | `python3 scripts/audit.py` | 69 checks covering grammar, hand-computed data flow, graph edges, slices, rules, the HTTP workflow, malformed input, the interface contract, document accuracy, the claims the documents make about the code, and drift between the module table and the tree |
-| Mutation check | `python3 scripts/mutation_check.py` | 18 deliberate defects (parser, semantics, CFG, data flow, taint, slicing, rules, reporting); the suite has to catch every one, and does (18/18) |
-
-The evaluation numbers describe this corpus only. See `docs/EVALUATION.md` for
-what they do and do not mean, and `docs/LIMITATIONS.md` for the analysis limits
-and the security model of the tool.
-
-## Honesty rules this project follows
-
-- Findings are stated as *potential* flows with a certainty level; exploitability
-  is never claimed.
-- Constructs outside the subset produce explicit diagnostics; the run is marked
-  partial rather than being presented as analysed.
-- Grammar conflicts, rule-language conflicts, limits reached and analysis
-  approximations are reported in the interface, the API and the report.
-- Nothing in the product mocks an analysis result: every number in the interface
-  and every figure in these documents is produced by the engine on this checkout.
+CT-C is a documented subset: no pointers, unions, preprocessor expansion, dynamic
+memory, `switch`, `goto` or user-defined types. A construct outside the subset is
+rejected with a diagnostic instead of being approximated, so an absence of findings is
+a statement about analysed code rather than about skipped code. Flow is followed within
+a function directly and across functions only through explicit arguments and return
+values, up to a configured depth; there is no alias analysis. The complete list is in
+`docs/LIMITATIONS.md`.

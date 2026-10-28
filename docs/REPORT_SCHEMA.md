@@ -115,8 +115,8 @@ partial_reasons, timings
 during this run), `semantic_seconds`, `cfg_seconds`, `dataflow_seconds`,
 `taint_seconds`, `dependencies_seconds`, `slicing_setup_seconds`,
 `findings_seconds`. Because timings and the timestamp vary, two reports of the
-same source are not byte-identical; everything else is, and
-`tests/test_reporting.py` asserts exactly that by freezing those fields.
+same source are not byte-identical; every other field is a pure function of the
+source, the parser mode and the rule set.
 
 ## 4. HTML report
 
@@ -133,8 +133,7 @@ to disk for the CLI/evaluation path):
   metrics*, *Analysis limitations*, and a footer stating that the report is not a
   proof of exploitability;
 * the filename, the run id and every finding field go through an escaper, so a
-  filename such as `<test>` is rendered as `&lt;test&gt;`
-  (`tests/test_reporting.py::HtmlReportTests`).
+  filename such as `<script>` is rendered as `&lt;script&gt;`.
 
 There is deliberately **no PDF export**: producing a PDF would require a
 third-party dependency, and the project's rule is that a format is only offered

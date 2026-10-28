@@ -17,9 +17,16 @@ const PIPELINE = [
   ['Findings and reports', 'stable ids, evidence paths, JSON and HTML export'],
 ];
 
+// A statistic is normally a number or a version, but the file that was last analysed is
+// a name: it is shown a size smaller so that a long identifier wraps between words
+// rather than inside one.
+const LONG_VALUE = 10;
+
 function stat(value, label, hint = '') {
+  const text = value === null || value === undefined ? '—' : String(value);
+  const size = text.length > LONG_VALUE ? 'stat__value stat__value--long' : 'stat__value';
   return el('div', { class: 'stat' }, [
-    el('div', { class: 'stat__value', text: value === null || value === undefined ? '—' : String(value) }),
+    el('div', { class: size, text }),
     el('div', { class: 'stat__label', text: label }),
     hint ? el('div', { class: 'stat__hint', text: hint }) : null,
   ]);

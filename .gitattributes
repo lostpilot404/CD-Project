@@ -1,2 +1,3 @@
 # The finished project report is a generated binary, not line-oriented source.
 *.pdf binary
+*.docx binary

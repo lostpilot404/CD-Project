@@ -3,8 +3,8 @@
 This document explains every compiler concept the project is built on, why it is
 needed here, how it is implemented, the equations it follows, and a worked
 example with the intermediate results the implementation really produces. Every
-number quoted below was printed from this checkout (engine 1.0.0, Python 3.11.2);
-every claim points at the file and the test that pins it.
+number quoted below was printed from this checkout (engine 1.0.0, Python 3.11.2), and
+every claim points at the file that produces it.
 
 | Concept | Section | Implementation |
 | --- | --- | --- |
@@ -64,10 +64,8 @@ The trailing comment produces no token, and `EOF` has `offset = len(source)`.
 Diagnostics from `LEX100`–`LEX102` carry the *keyword* span, e.g. `switch` at
 `1:14` in `examples/unsupported/switch_statement.ctc`.
 
-**Implementation / tests / limits.** `codetrace/frontend/lexer.py`;
-`tests/test_lexer.py` (19 tests: token kinds, offsets, comments, literals,
-invalid characters, unterminated literals, unsupported keywords).
-Limit: regular languages cannot count nesting — that is the parser's job.
+**Implementation and limits.** `codetrace/frontend/lexer.py`. Limit: regular languages
+cannot count nesting — that is the parser's job.
 
 ---
 
@@ -114,19 +112,17 @@ FOLLOW(stmt_list) has 27 terminals, including RBRACE and every statement keyword
 ```
 
 `program` is nullable because `decl_list` is: an empty translation unit is a
-legal program (the test `test_empty_input_parses_as_an_empty_translation_unit`
-pins that, and `SEM020` *reports* that there is no `main`).
+legal program (an empty input parses as an empty translation unit, and `SEM020` *reports*
+that there is no `main`).
 
 **Terminals and non-terminals are disjoint.** `Grammar.finalize()` computes the
 terminal set as "right-hand-side symbols that are never left-hand sides", and
 subtracts the non-terminals that were provisionally recorded while productions
 were added. Without that subtraction FOLLOW sets contain non-terminals and the
-ACTION table gains entries no token can match; `test_terminals_and_nonterminals_
-are_disjoint` and `test_action_table_is_keyed_by_token_kinds` guard the invariant.
+ACTION table gains entries no token can match, so the two sets are kept disjoint.
 
-**Implementation / tests / limits.** `codetrace/frontend/grammar.py`;
-`tests/test_parser.py::GrammarConstructionTests`. Limitation: the grammar is not
-LL(k) — `else` binds to the nearest `if` and the layered expression productions
+**Implementation and limits.** `codetrace/frontend/grammar.py`. Limitation: the grammar is
+not LL(k) — `else` binds to the nearest `if` and the layered expression productions
 need one token of lookahead, which is exactly why LR is used.
 
 ---
@@ -161,11 +157,11 @@ defined for both terminals and non-terminals, closure only expands non-terminals
 
 Four items — `decl_list` is nullable, so `decl_list → ·` is in the closure and
 no production of `decl` is needed yet. Item sets are stored as `frozenset`s, so
-duplicate items cannot appear (`test_item_sets_are_deduplicated`).
+duplicate items cannot appear.
 
-**Implementation / tests / limits.** `Grammar.closure`, `Grammar.goto`;
-`tests/test_parser.py`. Limit: closure is computed per construction step, so a
-much larger grammar would want the kernel-item representation used by LALR.
+**Implementation and limits.** `Grammar.closure`, `Grammar.goto`. Limit: closure is
+computed per construction step, so a much larger grammar would want the kernel-item
+representation used by LALR.
 
 ---
 
@@ -192,10 +188,9 @@ canonical  656       1027          1832         76          51           36
 State 0 holds 16 LR(1) items (the same four LR(0) items, each with the several
 lookaheads `FIRST` can produce from that context).
 
-**Implementation / tests / limits.** `build_canonical_lr1_automaton`;
-`tests/test_parser.py::test_canonical_lr1_has_more_states_than_lalr`.
-Limit: 656 states for this grammar is 3.9× the LALR size — the table cost is the
-classic reason to prefer LALR in production compilers.
+**Implementation and limits.** `build_canonical_lr1_automaton`. Limit: 656 states for this
+grammar is 3.9× the LALR size — the table cost is the classic reason to prefer LALR in
+production compilers.
 
 ---
 
@@ -225,10 +220,9 @@ LALR merged states   167      -> merge ratio 3.93 : 1
 reduce/reduce conflicts introduced by merging   0
 ```
 
-**Implementation / tests / limits.** `merge_lalr_states`;
-`test_canonical_lr1_has_more_states_than_lalr` asserts `canonical > lalr` and
-that both have zero conflicts. Limit: LALR cannot be more powerful than
-canonical LR(1); a grammar needing that power must use `mode="canonical"`
+**Implementation and limits.** `merge_lalr_states`. The merge keeps the canonical lookaheads
+exact here: no reduce/reduce conflict is introduced. Limit: LALR cannot be more powerful
+than canonical LR(1); a grammar needing that power must use `mode="canonical"`
 (`GET /api/grammar?mode=canonical`, and the *Grammar* panel in the UI).
 
 ---
@@ -246,14 +240,14 @@ matters.
 **How.** Same LR(0) automaton as LALR; the table builder substitutes
 `LA(I, A → α) = FOLLOW(A)`.
 
-**Worked example (measured).** `slr` mode: 167 states, 0 conflicts, 2172 ACTION
-entries — identical to LALR here, because CT-C subset v1 happens to be SLR(1).
-`tests/test_parser.py` builds an ambiguous expression grammar and asserts the
-conflict *is reported*, which is the honest way to demonstrate the difference.
+**Worked example (measured).** `slr` mode: 167 states, 0 conflicts, 2172 ACTION entries —
+identical to LALR here, because CT-C subset v1 happens to be SLR(1). An ambiguous
+expression grammar reports its conflict instead of hiding it, which is the honest way to
+demonstrate the difference.
 
-**Implementation / tests / limits.** `build_lr0_automaton` + the `slr` branch of
-`build_tables`. Limit: SLR resolves less than LR(1); the project therefore ships
-LALR as the default (`mode="lalr"`) and keeps canonical available for study.
+**Implementation and limits.** `build_lr0_automaton` + the `slr` branch of `build_tables`.
+Limit: SLR resolves less than LR(1); the project therefore ships LALR as the default
+(`mode="lalr"`) and keeps canonical available for study.
 
 ---
 
@@ -300,11 +294,9 @@ ACTION[2, KW_STRING] = shift 10       ACTION[2, KW_VOID]  = shift 4
 Read it as: "a declaration list is complete when the input ends; otherwise the
 next type keyword starts another declaration".
 
-**Implementation / tests / limits.** `codetrace/frontend/clr_parser.py`;
-`test_action_goto_tables_are_consistent`, `test_tables_are_deterministic`,
-`test_deliberate_conflict_is_detected_not_hidden`, `test_no_conflicts_in_the_
-shipped_modes`. Limit: table size is `states × terminals`; at 167 × 51 ≈ 8.5k
-entries this is trivial, and `items_max = 76` shows the states stay small.
+**Implementation and limits.** `codetrace/frontend/clr_parser.py`. Limit: table size is
+`states × terminals`; at 167 × 51 ≈ 8.5k entries this is trivial, and `items_max = 76`
+shows the states stay small.
 
 ---
 
@@ -346,10 +338,8 @@ parse the `return`; `examples/syntax_errors/*.ctc` are the labelled corpus cases
 for this. A `switch` keyword produces `LEX100` + `SYN100` and the statement is
 skipped, never silently ignored.
 
-**Implementation / tests / limits.** `CLRParser.parse`;
-`tests/test_parser.py::ParserDiagnosticTests`. Limit: recovery is heuristic — the
-report states which statements were skipped rather than pretending the file
-parsed.
+**Implementation and limits.** `CLRParser.parse`. Limit: recovery is heuristic — the report
+states which statements were skipped rather than pretending the file parsed.
 
 ---
 
@@ -388,11 +378,9 @@ SourceUnit                       span [0,49)
 `function` (declared in the file) or `unresolved` (reported as `SEM008`). The
 node inspector in the UI shows exactly this shape.
 
-**Implementation / tests / limits.** `codetrace/frontend/ast_nodes.py`;
-`test_locations_are_attached_to_every_node`, `test_second_parse_reports_correct_
-locations` (the cached-tables bug that once reset every location to line 1).
-Limit: the tree is concrete in the sense that parentheses and precedence
-structure stay visible through the expression node hierarchy.
+**Implementation and limits.** `codetrace/frontend/ast_nodes.py`. Limit: the tree is
+concrete in the sense that parentheses and precedence structure stay visible through the
+expression node hierarchy.
 
 ---
 
@@ -440,12 +428,10 @@ scope 1 (main)     symbol #1 'i'      int      declared 1:23
 scope 2 (block)    symbol #2 'i'      string   declared 1:39   -> SEM018 shadowing warning
 ```
 
-The reference inside the block resolves to `#2`, the `return i` to `#1`; the
-data-flow and taint results are expressed with those ids, so the two `i`s stay
-separate (`tests/test_semantics.py::SymbolTableTests`).
+The reference inside the block resolves to `#2`, the `return i` to `#1`; the data-flow and
+taint results are expressed with those ids, so the two `i`s stay separate.
 
-**Implementation / tests / limits.** `codetrace/semantics/`;
-`tests/test_semantics.py` (20 tests). Limit: no user-defined types, no
+**Implementation and limits.** `codetrace/semantics/`. Limit: no user-defined types, no
 conversions beyond the documented narrowing rule, no overloading.
 
 ---
@@ -481,10 +467,9 @@ block 4 normal       stmts [b=a+b, a=a+1]  succ 4 -loop-back-> 2            pred
 
 `cfg.stats()`: 5 blocks, 5 edges, 4 definitions, 1 loop, 0 unreachable blocks.
 
-**Implementation / tests / limits.** `codetrace/analysis/cfg.py`;
-`tests/test_cfg.py` (15 tests). Limit: the language has no `goto`, so the CFG is
-structured by construction; this is documented rather than hidden (it is also
-why control dependence can be derived from the AST, see §17).
+**Implementation and limits.** `codetrace/analysis/cfg.py`. Limit: the language has no
+`goto`, so the CFG is structured by construction; this is documented rather than hidden
+(it is also why control dependence can be derived from the AST, see §17).
 
 ---
 
@@ -537,11 +522,9 @@ reaching definitions and **6** for live variables; the iteration counts are
 reported per run in `metrics["dataflow_iterations"]` and per function in the
 `/dataflow` payload.
 
-**Implementation / tests / limits.** `codetrace/analysis/dataflow.py`,
-`tests/test_dataflow.py` (26 tests, including hand-computed fixpoints and the
-iteration cap). Limit: the framework is intra-procedural — the interprocedural
-part is the taint layer (§16) — and the domain is finite and atom-based, so it
-cannot express value-dependent facts.
+**Implementation and limits.** `codetrace/analysis/dataflow.py`. Limit: the framework is
+intra-procedural — the interprocedural part is the taint layer (§16) — and the domain is
+finite and atom-based, so it cannot express value-dependent facts.
 
 ---
 
@@ -582,11 +565,10 @@ int main() { int a = 1; int b = 2; while (a < 3) { b = a + b; a = a + 1; } retur
 
 `OUT(body) = {d2, d3} ⊆ IN(header)` is the loop-carried fact that only a
 fixpoint finds; a single pass over the blocks would report `{d0, d1}`.
-`scripts/audit.py` re-checks exactly these sets.
+The three block sets above are exactly what the engine prints for this example.
 
-**Implementation / tests / limits.** `codetrace/analysis/reaching_definitions.py`;
-`tests/test_dataflow.py::ReachingDefinitionsTests`, `tests/test_workflow.py`.
-Limit: array elements and struct fields are not distinguished.
+**Implementation and limits.** `codetrace/analysis/reaching_definitions.py`. Limit: array
+elements and struct fields are not distinguished.
 
 ---
 
@@ -624,9 +606,8 @@ are different atoms.
 `IN(return) = {s3:b}` and `OUT(return) = ∅` are the facts that make the final
 `return b` the only live use at the exit; convergence takes 6 iterations.
 
-**Implementation / tests / limits.** `codetrace/analysis/liveness.py`;
-`tests/test_dataflow.py::LivenessTests`, `scripts/audit.py`. Limit: as above,
-no alias or array-element precision.
+**Implementation and limits.** `codetrace/analysis/liveness.py`. Limit: as above, no alias
+or array-element precision.
 
 ---
 
@@ -652,7 +633,7 @@ uninitialised reads = { reads of v at p | v ∉ IN[p] and v not killed by a
                         definition earlier in the same block }
 ```
 
-**Worked example (measured).** For `int main() { int a; int b = a + 1; return b; }`
+**Worked example (measured).** For `int main() { int a; int b = a + 1; return b; }`:
 
 ```
 statement states:  0: in {} out {}        1: in {} out {s3:b}      2: in {s3:b} out {s3:b}
@@ -665,26 +646,21 @@ block's GEN set is `{b}` and the read of `a` in the same statement is flagged
 with its exact location.
 
 **The initial value is not a formality.** A *may* analysis starts at the
-interval/bitset bottom (∅) because the union meet can only grow; a *must*
-analysis must start at ⊤ everywhere except the entry, because the intersection
-meet can only shrink. Starting definite assignment at ∅ instead makes the result
-depend on the order in which blocks are first visited: a loop header whose back
-edge is processed before the fact has been established intersects with an empty
-set and loses it. On `int n = 0; for (int i = 0; i < 3; i++) { n = n + i; }
-return n;` the fact "`n` is assigned" survives the back edge only with ⊤
-initialisation; with ∅ the analysis reports `DFA001` for a variable that is
-assigned on every path — a false positive produced entirely by the choice of
-initial value. The engine implements the boundary as
-`initial_value(entry) = ∅`, `initial_value(other) = ⊤`
-(`definite_assignment.py`), and the hand-verified loop and nested-loop tests in
-`tests/test_dataflow.py::MustAnalysisInitialisationTests` fail if the override is
-removed.
+interval/bitset bottom (∅) because the union meet can only grow; a *must* analysis must
+start at ⊤ everywhere except the entry, because the intersection meet can only shrink.
+Starting definite assignment at ∅ instead makes the result depend on the order in which
+blocks are first visited: a loop header whose back edge is processed before the fact has
+been established intersects with an empty set and loses it. On
+`int n = 0; for (int i = 0; i < 3; i++) { n = n + i; } return n;` the fact "`n` is
+assigned" survives the back edge only with ⊤ initialisation; with ∅ the analysis reports
+`DFA001` for a variable that is assigned on every path — a false positive produced
+entirely by the choice of initial value. The engine implements the boundary as
+`initial_value(entry) = ∅`, `initial_value(other) = ⊤` (`definite_assignment.py`), which
+is what keeps the loop-carried fact in the example above.
 
-**Implementation / tests / limits.** `codetrace/analysis/definite_assignment.py`;
-`tests/test_dataflow.py::DefiniteAssignmentTests::`
-`::MustAnalysisInitialisationTests`, `/api/runs/{id}/dataflow?analysis=definite`,
-`scripts/audit.py`. Limit: no path-sensitivity inside expressions, no tracking of
-partially assigned arrays.
+**Implementation and limits.** `codetrace/analysis/definite_assignment.py`,
+`/api/runs/{id}/dataflow?analysis=definite`. Limit: no path-sensitivity inside expressions,
+no tracking of partially assigned arrays.
 
 ---
 
@@ -746,12 +722,10 @@ With a helper (`build_command(name)` returning `"ls " + name`), the path gains a
 `call`, a `parameter` and a `return` step, and the finding is marked
 `interprocedural: true` with the context-insensitivity limitation attached.
 
-**Implementation / tests / limits.** `codetrace/analysis/taint.py`,
-`codetrace/findings/explain.py`; `tests/test_taint.py` (40 tests: positives,
-negatives, sanitiser contexts and argument indices, unknown calls, branches,
-recursion, custom rules). Limits: context-insensitive summaries (documented in
-`docs/LIMITATIONS.md`), no path-sensitivity beyond the guard rules, no array or
-alias precision.
+**Implementation and limits.** `codetrace/analysis/taint.py`,
+`codetrace/findings/explain.py`. Limits: context-insensitive summaries (documented in
+`docs/LIMITATIONS.md`), no path-sensitivity beyond the guard rules, no array or alias
+precision.
 
 ---
 
@@ -793,16 +767,15 @@ the payload (`limit=4000`, `truncated` flag) and never emits an edge whose
 endpoints are not in the payload; an unrecognised kind name selects nothing and
 yields an empty payload rather than an error.
 
-**Worked example.** `scripts/audit.py` re-verifies, for every intra-procedural
-data/taint edge, that the source definition is in the target statement's IN set
-(or OUT when the definition lives in the target statement, as in
-`string name = input();`), using the bitsets of §13. In the audit run for the
-`build_command` example: **6 edges checked, 0 unjustified**.
+**Worked example.** Every intra-procedural data and taint edge is derived from the
+reaching-definition bitsets of §13: the source definition must be in the target
+statement's IN set (or OUT when the definition lives in the target statement, as in
+`string name = input();`). For the `build_command` example this gives 10 edges, each of
+which names the fact that justifies it.
 
-**Implementation / tests / limits.** `codetrace/analysis/dependencies.py`;
-`tests/test_slicing.py::DependencyGraphTests`, `scripts/audit.py`. Limit: edges
-are conservative (may-overlap), and interprocedural edges use the summary
-information of §16 rather than a call-site-sensitive analysis.
+**Implementation and limits.** `codetrace/analysis/dependencies.py`. Limit: edges are
+conservative (may-overlap), and interprocedural edges use the summary information of §16
+rather than a call-site-sensitive analysis.
 
 ---
 
@@ -860,11 +833,9 @@ keeps the two definitions of `cmd` that the sink's value flows through. The
 security slice equals the backward slice of the sink here; in a program where
 the sink's value also flows onwards, it is strictly larger.
 
-**Implementation / tests / limits.** `codetrace/analysis/slicing.py`;
-`tests/test_slicing.py` (22 tests: direction, criteria, closure, reasons,
-determinism, subgraph consistency, search states). Limit: slices are
-conservative over-approximations (the note says so), they use the same
-may-overlap edges as §17, and array/alias imprecision carries over.
+**Implementation and limits.** `codetrace/analysis/slicing.py`. Limit: slices are
+conservative over-approximations (the note says so), they use the same may-overlap edges
+as §17, and array/alias imprecision carries over.
 
 ---
 
@@ -891,11 +862,9 @@ classifies each finding as `new` (id only after), `resolved` (id only before),
 **Worked example.** Inserting a blank line above `system(cmd);` keeps the id
 `F7A2E2F89F9F6` and the comparison reports `moved` with `before.line = 1`,
 `after.line = 2`; replacing the tainted value with `shell_escape(...)` produces a
-different id and is reported as `resolved` (verified over HTTP by
-`scripts/audit.py` and `tests/test_workflow.py`).
+different id and is reported as `resolved`.
 
-**Implementation / tests / limits.** `codetrace/findings/models.py`
-(`stable_finding_id`, `compare_findings`); `tests/test_api.py` (compare tests),
-`tests/test_workflow.py::test_09_*`. Limit: identity is textual for the sink
-statement, so renaming the sink's variable changes the id — a deliberate
-trade-off, documented in `docs/LIMITATIONS.md`.
+**Implementation and limits.** `codetrace/findings/models.py` (`stable_finding_id`,
+`compare_findings`). Limit: identity is textual for the sink statement, so renaming the
+sink's variable changes the id — a deliberate trade-off, documented in
+`docs/LIMITATIONS.md`.

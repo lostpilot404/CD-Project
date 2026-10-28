@@ -5,7 +5,7 @@ in terms of `n` = source characters, `t` = tokens, `P` = grammar productions,
 `B` = basic blocks of a function, `E` = CFG edges, `A` = lattice atoms of an
 analysis, `S` = statements, `w` = machine words in a bitset (`ceil(A/30)` for
 CPython's small-int digits). "Measured" numbers come from this environment
-(Python 3.11.2, engine 1.0.0) and are reproducible with `scripts/audit.py` and
+(Python 3.11.2, engine 1.0.0) and are reproducible with
 `evaluation/run_evaluation.py`.
 
 ---
@@ -61,8 +61,7 @@ repeat until stable:
   in ≈ 0.3 s).
 * **Correctness detail:** every right-hand-side symbol is stored in one symbol
   namespace during construction and the non-terminals are subtracted in
-  `finalize()`, so FIRST/FOLLOW and ACTION contain only terminals
-  (`test_terminals_and_nonterminals_are_disjoint`).
+  `finalize()`, so FIRST/FOLLOW and ACTION contain only terminals.
 
 ## 3. Canonical LR(1) collection
 
@@ -130,7 +129,7 @@ for each state i:
   2172 ACTION entries and 382 GOTO entries for 167 states and 51 terminals.
 * **Determinism:** the iteration order is the production order, so two builds in
   one process (or in two processes with the same Python version) produce
-  identical tables (`test_tables_are_deterministic`).
+  identical tables.
 
 ## 6. LR parsing
 
@@ -193,8 +192,7 @@ analyse(ast):
 
 * **Complexity:** O(ast nodes · scope depth) with dict lookups per scope.
 * **Symbol identity:** ids are allocated in declaration order, so the same name
-  in two scopes yields two ids and never conflates two variables
-  (`tests/test_semantics.py::SymbolTableTests`).
+  in two scopes yields two ids and never conflates two variables.
 * **Measured:** semantic analysis of a 60-byte example is ≈ 0.09 ms.
 
 ## 9. CFG construction
@@ -214,7 +212,7 @@ build(function):
 
 * **Complexity:** O(S) blocks and edges with an amortised O(1) per statement;
   loops are identified by the back edges recorded during construction.
-* **Measured:** the audit's loop example yields 5 blocks, 5 edges, 1 loop, 0
+* **Measured:** the loop example from §10 yields 5 blocks, 5 edges, 1 loop, 0
   unreachable blocks.
 
 ## 10. Worklist data-flow solver
@@ -235,7 +233,7 @@ solve(problem, max_iterations, max_steps):
 * **Complexity:** for a bit-vector lattice, each block's value can grow at most
   `A` times, and each growth re-evaluates its neighbours, so the number of
   transfer evaluations is O(A · E); with word-parallel bitsets each evaluation
-  costs O(w) machine words → O(A · E · w). In practice: the audit's loop needs
+  costs O(w) machine words → O(A · E · w). In practice: that loop needs
   **10** iterations for reaching definitions and **6** for liveness on 5 blocks.
 * **Why a worklist:** sparse updates beat round-robin sweeps — most blocks are
   stable after the first pass, and the solver reports `processed_order`,
@@ -259,8 +257,8 @@ Liveness (backward, union):
 
 * **Complexity:** as §10. Domains are bit vectors over `d<id>` / `s<id>:<name>`
   atoms, so meet and transfer are one or two integer operations each.
-* **Measured:** the loop example converges in 10 and 6 iterations respectively;
-  `scripts/audit.py` re-checks the resulting sets against hand calculations.
+* **Measured:** the loop example converges in 10 and 6 iterations respectively,
+  the same sets a hand calculation gives.
 
 ## 12. Definite assignment (*must* analysis)
 
@@ -354,11 +352,9 @@ build_graph(program):
 * **Measured:** 3–13 nodes and 1–19 edges across the 30 analysable corpus files
   (largest: `interprocedural/recursion.ctc`).  The count includes the
   `source-to-sink` edges of the reported flows, so a file that reports a
-  finding carries more edges than its data/control graph alone;
-  `scripts/audit.py` re-verifies
-  every intra-procedural data/taint edge of its own example against the reaching
-  definitions (3 edges in that example, 0 unjustified) and fails if any edge
-  cannot be justified.
+  finding carries more edges than its data/control graph alone. Every
+  intra-procedural data and taint edge names the reaching definition that
+  justifies it.
 
 ## 15. Slicing
 
@@ -396,7 +392,7 @@ for each TaintHit:
 * **Determinism:** findings are sorted by
   `(severity rank, certainty rank, line, column)` and the id is a pure function
   of the analysis result, so the same source and rule set give the same ids and
-  the same order (`test_report_is_deterministic_apart_from_the_timestamp`).
+  the same order.
 
 ## 17. Run comparison
 
