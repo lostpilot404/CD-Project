@@ -101,6 +101,8 @@ docs/                  the documentation set (below)
 | `docs/PRESENTATION.md` | talk outline, demo script and viva questions |
 | `docs/CodeTrace_Project_Report.md` | editable source of the project report, including verification evidence |
 | `docs/CodeTrace_Project_Report.pdf` | the finished BCSE307P project report |
+| `docs/REVIEW_2_REPORT.md` | Review 2 deliverables: features added, work-file map, module reference, measured results |
+| `docs/Review2_CodeTrace_Report.docx` | Review 2 report on the BCSE307P template: features with screenshots, GitHub link, contents page, work-file explanation and module-wise reference |
 
 The Documentation page inside the application serves the same facts from the
 engine itself (language mode, grammar statistics, diagnostic catalogue, rule
@@ -117,6 +119,25 @@ python3 -m venv .venv
 .venv/bin/python -m pip install reportlab==5.0.1
 .venv/bin/python scripts/build_project_report.py --check
 ```
+
+### Rebuild the Review 2 report (optional)
+
+`docs/Review2_CodeTrace_Report.docx` is generated, not hand-edited: the template
+layout lives in `scripts/build_review2_docx.py`, the wording in
+`scripts/review2_content.py`, and the figures in `docs/review2_report_assets/`.
+Only the build needs `python-docx`, `reportlab` (text metrics) and `matplotlib`
+(diagrams); running the application and its tests does not.
+
+```bash
+python3 scripts/make_review2_figures.py                 # diagrams and logo
+python3 scripts/build_review2_docx.py                   # -> docs/Review2_CodeTrace_Report.docx
+python3 scripts/build_review2_docx.py --page-map map.json   # contents page from measured pages
+```
+
+Every number in that report is measured from this tree: the file and line counts
+of Chapter 4.2 and 4.7 come from the files themselves, the parser-table numbers
+from `codetrace.frontend.pipeline.parser_tables`, and the suite results from the
+commands in the Verification table above.
 
 Keep generated analysis reports, evaluation JSON, screenshots, logs and scratch
 probes under the ignored `var/` directory. The project-report PDF in `docs/`

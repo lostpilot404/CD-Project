@@ -146,3 +146,30 @@ CodeTrace is an inspectable, offline-first static program and vulnerability anal
 | Corpus Precision | Finding accuracy on 33 programs | 1.000 (100.0%) | **OPTIMAL** |
 | Corpus Recall | Vulnerability detection rate | 1.000 (100.0%) | **OPTIMAL** |
 | Corpus F1 Score | Harmonic mean of precision/recall | 1.000 (100.0%) | **OPTIMAL** |
+
+---
+
+## 5. Deliverables Produced for Review 2
+
+| Deliverable | Where | What it contains |
+|---|---|---|
+| Review 2 report (Word, on the BCSE307P template) | `docs/Review2_CodeTrace_Report.docx` | Cover page with the institute mark, bonafide certificate, declaration, abstract, a contents page with page numbers, Chapters 1–4, and a 14-entry reference list |
+| Interface screenshots | `docs/review2_screenshots/` | 12 captures of the running workbench (2049 × 1260), one per feature |
+| Report figures | `docs/review2_report_assets/` | Architecture diagram, pipeline diagram, evidence-path diagram, dependency graph and the institute mark |
+| Report builder | `scripts/build_review2_docx.py`, `scripts/review2_content.py` | Template layout and wording, separated so the text can be edited without touching the layout |
+| Figure builder | `scripts/make_review2_figures.py` | Redraws the architecture diagram and extracts the published figures |
+| This summary | `docs/REVIEW_2_REPORT.md` | Feature list, work-file map, module reference and the measured results above |
+
+The Word report keeps the template order — cover, certificate, declaration,
+abstract, contents, Chapters 1–4, references — and fills the template's
+placeholders (title, team, guide, date, screenshots, progress/challenges,
+conclusion) with the Review 2 material. Its contents page carries measured page
+numbers and is a live Word field, so `F9` (or the automatic refresh Word
+performs on open) re-computes it after any edit.
+
+Rebuild it with:
+
+```bash
+python3 scripts/make_review2_figures.py
+python3 scripts/build_review2_docx.py                # --page-map to set TOC pages
+```
