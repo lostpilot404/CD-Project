@@ -24,3 +24,10 @@ var/
 # `npm install` would otherwise add files nobody needs.
 node_modules/
 package-lock.json
+
+# Local agent and tool caches
+.codegraph/
+.playwright-cli/
+.serena/
+codegraph.json
+*.bak*

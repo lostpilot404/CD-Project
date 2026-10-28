@@ -61,6 +61,8 @@ export function resetRun() {
     resetCounter: state.resetCounter + 1,
     run: null,
     source: '',
+    analysedSource: null,
+    editorDirty: false,
     statementsById: {},
     selectedFinding: null,
     selectedFindingDetail: null,

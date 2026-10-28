@@ -340,7 +340,29 @@ function wireInputs() {
   const customRules = view.querySelector('#rules-input');
   const rules = document.getElementById('rule-editor');
 
-  editor.addEventListener('input', () => update({ source: editor.value }));
+  const analyzeButton = view.querySelector('#analyze-button');
+
+  editor.addEventListener('input', () => {
+    update({ source: editor.value });
+    if (analyzeButton && analyzeButton.disabled) return;
+    if (state.run && state.analysedSource !== undefined && state.analysedSource !== null) {
+      const isDirty = editor.value !== state.analysedSource;
+      update({ editorDirty: isDirty });
+      const status = view.querySelector('#analyze-status');
+      if (status) {
+        if (isDirty) {
+          render(status, el('span', {
+            class: 'alert alert--warn',
+            text: 'The results below are for the text that was submitted. The editor has been changed since then — run the analysis again to analyse the current text.',
+          }));
+        } else {
+          render(status, el('span', {
+            text: `Analysed ${state.run.filename} in ${state.run.total_analysis_seconds} s (run ${state.run.run_id}).`,
+          }));
+        }
+      }
+    }
+  });
   filename.addEventListener('input', () => { filename.dataset.touched = 'true'; });
 
   view.querySelector('#analyze-button').addEventListener('click', async () => {
