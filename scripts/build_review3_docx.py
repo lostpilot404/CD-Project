@@ -3,7 +3,8 @@
 
 The document follows Template.pdf page for page (cover with the institute mark,
 bonafide certificate, declaration, abstract, table of contents, numbered chapters,
-references) and adds a list of figures and a list of tables for Review 3.
+references). The wording comes from ``review3_short.py``, the submitted edition;
+``--content review3_content --with-lists`` reproduces the full-length edition.
 
 Typography, as required for this submission:
 
@@ -671,6 +672,7 @@ def render_cover(doc):
     line(GUIDE, 12, bold=True, space_before=4)
     line(GUIDE_TITLE, 12, bold=True, space_before=3)
     line(MONTH_YEAR, 15, bold=True, space_before=22)
+    line(f"Repository: {REPO_URL}", 10, italic=True, space_before=10)
 
 
 def render_certificate(doc):
@@ -966,8 +968,11 @@ def fitting_widths(headers, rows, widths, size):
     for column in range(len(widths)):
         longest = 0.0
         for row in [headers] + list(rows):
-            for token in str(row[column]).split():
-                longest = max(longest, stringWidth(token, "Times-Roman", size))
+            # a cell may mix body text and code spans; the code spans are set in a
+            # monospaced face, which is wider, so each token is measured in its own face
+            for token, font in _tokens_of(str(row[column])):
+                if token.strip():
+                    longest = max(longest, stringWidth(token, METRIC_FONT[font], size))
         # a word that is only slightly wider than the column may hyphenate, so the
         # column is not forced to its exact width for a single long token
         need.append(min(longest / 72.0 + pad, widths[column] + 0.25))
@@ -1062,8 +1067,10 @@ def collect_facts(content):
     }
 
 
-def build(output, abstract=None, start_page_override=None, page_map=None):
-    import review3_content as content
+def build(output, abstract=None, start_page_override=None, page_map=None,
+          content_name="review3_short", include_lists=False):
+    import importlib
+    content = importlib.import_module(content_name)
 
     facts = collect_facts(content)
     composer = Composer()
@@ -1077,8 +1084,8 @@ def build(output, abstract=None, start_page_override=None, page_map=None):
                   for b in blocks if b["kind"] == "table"]
 
     front_pages = 4                      # cover, certificate, declaration, abstract
-    page_counts = [len(split_list_rows(rows))
-                   for rows in (entries, figure_rows, table_rows)]
+    lists = (entries, figure_rows, table_rows) if include_lists else (entries,)
+    page_counts = [len(split_list_rows(rows)) for rows in lists]
     start_page = front_pages + sum(page_counts) + 1   # +1: the first body page follows the lists
     if start_page_override:
         start_page = start_page_override
@@ -1111,8 +1118,8 @@ def build(output, abstract=None, start_page_override=None, page_map=None):
         return pages, marked
 
     toc_pages, toc_rows = chunk(entries)
-    lof_pages, lof_rows = chunk(figure_rows)
-    lot_pages, lot_rows = chunk(table_rows)
+    lof_pages, lof_rows = chunk(figure_rows if include_lists else [])
+    lot_pages, lot_rows = chunk(table_rows if include_lists else [])
 
     doc = new_document()
     render_cover(doc)
@@ -1126,11 +1133,12 @@ def build(output, abstract=None, start_page_override=None, page_map=None):
     render_list(doc, "TABLE OF CONTENTS", toc_rows,
                 field=' TOC \\o "1-2" \\h \\z \\u ')
     doc.add_page_break()
-    # the figure and table lists are written as plain text: the captions are not SEQ
-    # fields, so a Word field here would be emptied the first time it was refreshed
-    render_list(doc, "LIST OF FIGURES", lof_rows)
-    doc.add_page_break()
-    render_list(doc, "LIST OF TABLES", lot_rows)
+    if include_lists:
+        # the figure and table lists are written as plain text: the captions are not SEQ
+        # fields, so a Word field here would be emptied the first time it was refreshed
+        render_list(doc, "LIST OF FIGURES", lof_rows)
+        doc.add_page_break()
+        render_list(doc, "LIST OF TABLES", lot_rows)
     render_blocks(doc, blocks)
 
     props = doc.core_properties
@@ -1163,6 +1171,11 @@ def main(argv=None):
                         default=os.path.join(ROOT, "docs", "Review3_CodeTrace_Report.docx"))
     parser.add_argument("--start-page", type=int, default=None,
                         help="override the first body page number")
+    parser.add_argument("--content", default="review3_short",
+                        help="module holding the report wording (review3_short, the submitted "
+                             "edition, or review3_content, the full-length edition)")
+    parser.add_argument("--with-lists", action="store_true",
+                        help="add a list of figures and a list of tables after the contents")
     parser.add_argument("--page-map", default=None,
                         help="JSON file mapping a heading label to a measured page number; "
                              "used to fill the table of contents from a rendered proof")
@@ -1175,7 +1188,8 @@ def main(argv=None):
         import json
         with open(args.page_map, encoding="utf-8") as handle:
             page_map = json.load(handle)
-    build(args.output, start_page_override=args.start_page, page_map=page_map)
+    build(args.output, start_page_override=args.start_page, page_map=page_map,
+          content_name=args.content, include_lists=args.with_lists)
     return 0
 
 
