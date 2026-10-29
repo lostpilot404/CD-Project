@@ -80,6 +80,13 @@ states. When a cap is reached the run sets `limits_hit`, marks the analysis
 partial (`summary.analysis_complete = false`, `partial_reasons`) and says which
 cap was hit. Truncation is never silent.
 
+Syntax recovery is statement-level: one fault inside a compound header (a
+`for (…)` header, say) can produce several `SYN001` diagnostics — the first at
+the fault, later ones after the damaged header mis-parses its remaining
+clauses — bounded by the 25-error cap, with the file rejected and the run
+marked partial. Missing separators between statements stay single errors
+(`docs/COMPILER_THEORY.md` §8).
+
 ### 1.5 Coverage of the evaluation corpus
 
 The measured precision/recall figures in `docs/EVALUATION.md` describe **the 33

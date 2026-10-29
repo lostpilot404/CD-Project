@@ -349,6 +349,18 @@ in `summary.partial_reasons`. Every recovery either advances the position or
 shrinks the stack, so the parse always makes progress; when a step can do
 neither, the caller stops instead of looping forever.
 
+**Known limitation — faults inside compound headers.** Resynchronisation is
+*statement*-level, so a single fault inside a `for (…)` header can produce
+several diagnostics. Measured: `for (int i = 0 i < 3; i = i + 1) { print(i); }`
+reports the first `SYN001` exactly at the fault (`unexpected identifier 'i'`
+where the `;` is missing), then further errors at later real tokens: the
+resync consumes the header's own `;` — legal for the stack — while discarding
+the condition, so the damaged header mis-parses its remaining clauses. Seven
+diagnostics result for one fault here (the pre-recovery parser produced six on
+the same input); the count stays bounded by `max_errors`, the file is rejected
+(`accepted: false`) and the run is marked partial. Missing separators between
+*statements* remain single errors, as the worked examples below show.
+
 **Worked examples (measured).** `int main() { int a = ; return 0; }` yields
 exactly one `SYN001` at the `;` (`expected: character literal, --, float
 literal, identifier, ++, integer literal (+6 more)`); the stack pops to the

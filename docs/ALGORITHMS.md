@@ -192,6 +192,12 @@ recover(stack, values, i):
 * **Reporting:** each recovery emits one diagnostic carrying the offending
   token, its `line:col` and the expected-token list; when the parse needed any
   recovery the run's `partial_reasons` says that statements were skipped.
+* **Known limitation:** resync is statement-level, so one fault *inside* a
+  compound header (`for (…)` parentheses) can emit several diagnostics: the
+  first lands on the fault, later ones on real tokens after the damaged header
+  mis-parses its remaining clauses (measured: 7 for one missing `;` in a
+  for-header, bounded by `max_errors`; statement-level separator faults stay
+  single errors — `docs/COMPILER_THEORY.md` §8).
 
 ## 8. Semantic analysis (attribute evaluation)
 
