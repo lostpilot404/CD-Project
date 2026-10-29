@@ -162,6 +162,12 @@ Diagnostics raised by the lexer (see ``codetrace/frontend/lexer.py``):
 A lexer diagnostic never stops the scan: the lexer resumes at the next
 character it can classify, so a single bad escape does not hide later errors.
 
+The alphabet check (``LEX008``) applies to code characters *outside* literals.
+Inside a string or character literal, every character except a raw newline is
+accepted verbatim and decoded into the literal's value — including control
+characters; what is checked there is the escape syntax and the literal length
+(``LEX001``, ``LEX005``–``LEX007``), not the character set.
+
 ## 2. Types
 
 | Type | Notes |
@@ -231,12 +237,73 @@ The complete keyword table with the reason for each exclusion is available at
 
 ## 5. Built-in external functions
 
-Externals are *not* part of the language: they are named by the rule set. The
-built-in rule set (``codetrace/rules/builtin/standard.ctrule``) declares the
-following functions, which is why they resolve without a declaration in the
-analysed file:
+Two independent layers give meaning to a call of a name that the analysed file
+does not define:
 
-| External | Kind | Function | Rule id |
+1. **Name resolution — a fixed external model.** ``codetrace/semantics/externals.py``
+   hard-codes the 27 functions tabulated below. They resolve without a
+   declaration, are type-checked against their signatures, and never produce
+   ``SEM008``. This layer does **not** depend on the rule set: switching rule
+   sets does not change which names resolve.
+2. **Security roles — the rule set.** Which names are taint *sources*, *sinks*,
+   *sanitizers* or *validators*, and which flows connect them, is declared by
+   rules — by default ``codetrace/rules/builtin/standard.ctrule`` (see
+   ``docs/RULE_LANGUAGE.md``). A call whose name no rule mentions is treated
+   conservatively by the taint engine: its result may depend on every argument
+   and nothing is assumed to sanitise anything; when tainted arguments flow
+   through such a call, the run records a note saying so.
+
+The two layers combine as follows for custom rule files: a rule may declare a
+function the external model does not know (say ``function fetch`` in a custom
+source rule). The taint engine applies the rule and reports the flow, while
+semantic analysis still emits ``SEM008`` for the unresolved name and treats its
+type conservatively. Conversely, a model function no rule mentions (``print``,
+``concat``, …) resolves and type-checks but stays taint-neutral beyond the
+conservative result rule above.
+
+### The external model (``externals.CATALOG``)
+
+| External | Category | Signature | Meaning |
+| --- | --- | --- | --- |
+| ``input()`` | source | ``string input()`` | reads one line from standard input (untrusted) |
+| ``input_int()`` | source | ``int input_int()`` | reads one integer from standard input (untrusted) |
+| ``readenv(name)`` | source | ``string readenv(string)`` | reads an environment variable (untrusted in most deployments) |
+| ``argv(index)`` | source | ``string argv(int)`` | returns a command-line argument as text (untrusted) |
+| ``argc()`` | source | ``int argc()`` | number of command-line arguments |
+| ``system(c)`` | sink | ``int system(string)`` | executes its argument through the system command interpreter |
+| ``exec(c)`` | sink | ``int exec(string)`` | executes its argument as an external program |
+| ``popen(c)`` | sink | ``int popen(string)`` | runs a shell command and returns a handle to its output |
+| ``fopen(path, mode)`` | sink | ``int fopen(string, string)`` | opens a filesystem path; attacker-controlled paths allow traversal |
+| ``readfile(path)`` | sink | ``string readfile(string)`` | reads a filesystem path; attacker-controlled paths allow traversal |
+| ``writefile(path, data)`` | sink | ``int writefile(string, string)`` | writes to a filesystem path (arbitrary file write when uncontrolled) |
+| ``printf(text, …)`` | sink | ``int printf(string, ...)`` | interprets its first argument as a format string |
+| ``sql_exec(text)`` | sink | ``int sql_exec(string)`` | executes its argument as a database query |
+| ``shell_escape(v)`` | sanitizer | ``string shell_escape(string)`` | quotes shell metacharacters; neutralises command taint only |
+| ``sql_escape(v)`` | sanitizer | ``string sql_escape(string)`` | escapes SQL metacharacters; neutralises SQL taint only |
+| ``html_escape(v)`` | sanitizer | ``string html_escape(string)`` | escapes HTML metacharacters; neutralises HTML taint only |
+| ``path_normalize(v)`` | sanitizer | ``string path_normalize(string)`` | normalises a path; neutralises path taint only |
+| ``to_int(v)`` | sanitizer | ``int to_int(string)`` | parses an integer; the result carries no text-level taint |
+| ``is_safe_command(v)`` | validator | ``bool is_safe_command(string)`` | returns true when its argument is a known-safe command name |
+| ``is_valid_path(v)`` | validator | ``bool is_valid_path(string)`` | returns true when its argument is an allowed path |
+| ``strlen(s)`` | pure | ``int strlen(string)`` | string length |
+| ``concat(a, b)`` | pure | ``string concat(string, string)`` | concatenation |
+| ``substr(s, from, len)`` | pure | ``string substr(string, int, int)`` | substring |
+| ``print(s)`` | pure | ``int print(string)`` | writes to standard output |
+| ``puts(s)`` | pure | ``int puts(string)`` | writes to standard output |
+| ``parse_int(s)`` | converter | ``int parse_int(string)`` | parses text as an integer without validating it |
+| ``to_string(n)`` | converter | ``string to_string(int)`` | integer to text |
+
+The model's category (``source``/``sink``/…) documents intent; the taint roles
+that decide findings come from the rules. A function that no rule and no model
+entry knows is *unknown*: it is never assumed to sanitise its arguments (see
+``docs/RULE_LANGUAGE.md``).
+
+### Roles in the built-in rule set
+
+``codetrace/rules/builtin/standard.ctrule`` declares the following roles over
+those names (rule ids in the last column):
+
+| External | Rule kind | Function | Rule id |
 | --- | --- | --- | --- |
 | ``input()`` | source | ``input`` | ``stdin`` |
 | ``input_int()`` | source | ``input_int`` | ``stdin_int`` |
@@ -244,16 +311,15 @@ analysed file:
 | ``argv(index)`` | source | ``argv`` | ``command_line`` |
 | ``readfile(path)`` | source **and** path sink | ``readfile`` | ``file_content`` / ``path_readfile`` |
 | ``system(c)``, ``exec(c)``, ``popen(c)`` | sink (context ``command``) | ``system`` / ``exec`` / ``popen`` | ``command_system`` / ``command_exec`` / ``command_popen`` |
-| ``fopen(path)``, ``writefile(path, data)`` | sink (context ``path``) | ``fopen`` / ``writefile`` | ``path_fopen`` / ``path_writefile`` |
+| ``fopen(path, mode)``, ``writefile(path, data)`` | sink (context ``path``, argument 0) | ``fopen`` / ``writefile`` | ``path_fopen`` / ``path_writefile`` |
 | ``sql_exec(text)`` | sink (context ``sql``) | ``sql_exec`` | ``sql_exec`` |
-| ``printf(text)`` | sink (context ``format``) | ``printf`` | ``format_printf`` |
+| ``printf(text, …)`` | sink (context ``format``) | ``printf`` | ``format_printf`` |
 | ``shell_escape(v)``, ``sql_escape(v)``, ``html_escape(v)``, ``path_normalize(v)`` | sanitizer | same name | ``shell_escape``, ``sql_escape``, ``html_escape``, ``path_normalize`` |
-| ``to_int(v)`` | sanitizer for every context | ``to_int`` | ``parse_to_int`` |
+| ``to_int(v)`` | sanitizer for every context (``*``) | ``to_int`` | ``parse_to_int`` |
 | ``is_safe_command(v)``, ``is_valid_path(v)`` | validator (guard) | same name | ``validate_command`` / ``validate_path`` |
 
-Running the analysis with a custom rule set replaces or extends these names; a
-function that no rule mentions is treated as *unknown*: it is never assumed to
-sanitise its arguments (see ``docs/RULE_LANGUAGE.md``).
+Names the built-in rules give no role: ``argc``, ``strlen``, ``concat``,
+``substr``, ``print``, ``puts``, ``parse_int``, ``to_string``.
 
 ## 6. Diagnostics summary
 

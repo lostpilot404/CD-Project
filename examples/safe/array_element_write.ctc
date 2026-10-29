@@ -1,0 +1,9 @@
+// expect: no finding and no DFA001: writing one array element never reads the array base
+int main() {
+  int a[4];
+  a[0] = 7;
+  int b = a[0] + 1;
+  a[1] = b;
+  a[1] += 1;
+  return a[1];
+}

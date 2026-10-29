@@ -280,8 +280,13 @@ async function loadSliceForFinding(findingId) {
 async function selectFinding(findingId) {
   update({ selectedFinding: findingId, selectedFindingDetail: null, slicing: { ...state.slicing, source: 'finding' } });
   refresh('findings');
+  // A "fixed" finding belongs to the comparison's *earlier* run: its full
+  // record lives there, and the run on screen answers 404 for it.
+  const inCurrentRun = Boolean(state.run && (state.run.findings || []).some((f) => f.id === findingId));
+  const earlierRunId = state.comparison && state.comparison.before && state.comparison.before.run_id;
+  const detailRunId = inCurrentRun || !earlierRunId ? state.run.run_id : earlierRunId;
   try {
-    const detail = await loadFindingDetail(state.run.run_id, findingId);
+    const detail = await loadFindingDetail(detailRunId, findingId);
     // A slow response for a previously selected finding must not be painted as
     // the detail of the finding that is selected now.
     if (state.selectedFinding !== findingId) return;
@@ -343,7 +348,9 @@ function wireInputs() {
   const analyzeButton = view.querySelector('#analyze-button');
 
   editor.addEventListener('input', () => {
-    update({ source: editor.value });
+    // Typing supersedes any status-area notice ("Loaded example …"): it
+    // describes text that is no longer in the editor.
+    update({ source: editor.value, analyzeNotice: null });
     if (analyzeButton && analyzeButton.disabled) return;
     if (state.run && state.analysedSource !== undefined && state.analysedSource !== null) {
       const isDirty = editor.value !== state.analysedSource;
@@ -367,7 +374,7 @@ function wireInputs() {
 
   view.querySelector('#analyze-button').addEventListener('click', async () => {
     const submitted = editor.value;
-    update({ editorDirty: false });
+    update({ editorDirty: false, analyzeNotice: null });
     // A response that was in flight when the user cleared the page must not
     // repopulate it with results for text that is no longer there.
     const resetAtSubmit = state.resetCounter;
@@ -383,7 +390,7 @@ function wireInputs() {
       // The user cleared the page (or reset it) while this request was in
       // flight: drop the result instead of resurrecting a run they discarded.
       resetRun();
-      refresh('analyze');
+      refresh(currentRoute());
       return;
     }
     if (run) {
@@ -395,7 +402,11 @@ function wireInputs() {
       // claiming that the displayed results described the visible text.
       const dirty = editor.value !== submitted;
       update({ editorDirty: dirty });
-      refresh('analyze');
+      // Refresh the route that is *visible*: the user may have navigated away
+      // while the analysis was in flight, and a hardcoded refresh('analyze')
+      // left the visible page stale ("No analysis has run yet") even though
+      // the run had arrived.
+      refresh(currentRoute());
       if (dirty) {
         const status = view.querySelector('#analyze-status');
         render(status, el('div', {
@@ -419,9 +430,16 @@ function wireInputs() {
         editor.value = example.content;
         filename.value = entry.name;
         filename.dataset.touched = 'true';
-        update({ source: example.content });
-        const status = view.querySelector('#analyze-status');
-        render(status, [el('span', { text: `Loaded ${entry.id}${example.expectation ? ` — ${example.expectation}` : ''}` })]);
+        // The notice goes through the state (not a direct DOM paint): the
+        // re-render that follows any navigation would otherwise wipe it.
+        update({
+          source: example.content,
+          analyzeNotice: {
+            kind: 'info',
+            text: `Loaded ${entry.id}${example.expectation ? ` — ${example.expectation}` : ''}`,
+          },
+        });
+        refresh('analyze');
       },
     });
   });
@@ -470,14 +488,19 @@ function wireInputs() {
     const view2 = document.getElementById('view-analyze');
     const customRules = view2.querySelector('#rules-input');
     customRules.value = rules.value;
+    // The confirmation goes through the state: the hash change below fires a
+    // hashchange event *after* this handler, whose re-render of the Analyze
+    // page used to wipe a directly painted status line before it was read.
+    update({
+      analyzeNotice: {
+        kind: rules.value.trim() ? 'info' : 'warn',
+        text: rules.value.trim()
+          ? 'The rule file from the Rule Editor is now in the custom rules box; it is validated when the analysis runs.'
+          : 'The Rule Editor is empty: write a rule file there, or load the example, before using this button.',
+      },
+    });
     window.location.hash = '#/analyze';
     refresh('analyze');
-    const status = view2.querySelector('#analyze-status');
-    render(status, [el('span', {
-      text: rules.value.trim()
-        ? 'The rule file from the Rule Editor is now in the custom rules box; it is validated when the analysis runs.'
-        : 'The Rule Editor is empty: write a rule file there, or load the example, before using this button.',
-    })]);
   });
 
   wireTheme();

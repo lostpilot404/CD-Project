@@ -121,7 +121,11 @@ export function renderGraphView(container, { state, onSelectNode, onMode, onKind
           functions.map((name) => el('option', { value: name, selected: name === cfgFunction, text: `${name}()` }))),
       ]),
     );
-  } else {
+  } else if (state.graph.mode === 'dependency') {
+    // Only the dependency-graph mode filters by edge kind.  The function-level
+    // view always asks the API for exactly the call and return edges; showing
+    // the checkboxes there offered controls that changed nothing (and an
+    // "enable more kinds" hint for a filter that mode does not have).
     toolbarControls.push(
       el('fieldset', { class: 'fieldset' }, [
         el('legend', { text: 'Edge kinds' }),
@@ -159,10 +163,12 @@ export function renderGraphView(container, { state, onSelectNode, onMode, onKind
   }
 
   const graph = state.graph.data;
-  if (!state.graph.kinds.length) {
+  if (state.graph.mode === 'dependency' && !state.graph.kinds.length) {
     // Unchecking every kind sent no filter at all, and the engine's documented
     // default for an empty filter is *every* kind, so "no kinds" silently drew
-    // all of them.  Say what is happening and offer the way back.
+    // all of them.  Say what is happening and offer the way back.  The
+    // function-level view ignores the kind filter entirely, so the gate does
+    // not apply there.
     render(canvas, el('div', {}, [
       el('p', { class: 'alert alert--info' },
         'No edge kinds are selected, so no edges are drawn. Select at least one kind, or use the button below.'),
@@ -185,12 +191,35 @@ export function renderGraphView(container, { state, onSelectNode, onMode, onKind
   } else if (!graph) {
     render(canvas, el('p', { class: 'empty-state', text: 'Loading graph…' }));
   } else {
+    // "Show in Program Graph" on the Findings page stores the finding's id as
+    // the graph's focus; the sink statement's node is highlighted so the jump
+    // lands somewhere the eye can follow.  Without this the focus value was
+    // set and never rendered.
+    const focused = state.graph.focus
+      ? ((run.findings || []).find((finding) => finding.id === state.graph.focus) || null)
+      : null;
+    const focusIds = focused && focused.sink && focused.sink.sid !== null && focused.sink.sid !== undefined
+      ? new Set([`s${focused.sink.sid}`])
+      : null;
+    const functionMode = state.graph.mode === 'function';
     render(canvas, renderGraph(graph, {
-      kinds: state.graph.kinds,
+      // The function-level payload is already exactly the call/return edges;
+      // filtering it again with the dependency mode's kind checkboxes hid
+      // edges the mode promised to show.
+      kinds: functionMode ? null : state.graph.kinds,
       selectedId: state.selectedStatement !== null ? `s${state.selectedStatement}` : null,
+      focusIds,
       onSelect: onSelectNode,
-      emptyMessage: 'No edges of the selected kinds exist in this graph. Enable more kinds to see the program structure.',
+      emptyMessage: functionMode
+        ? 'This program has no calls or returns between analysed functions, so the function-level view is empty.'
+        : 'No edges of the selected kinds exist in this graph. Enable more kinds to see the program structure.',
     }));
+    if (focused) {
+      panel.appendChild(el('p', {
+        class: 'hint',
+        text: `Focused finding ${focused.id} (${focused.rule_id}, ${focused.severity}): its sink statement is highlighted.`,
+      }));
+    }
     panel.appendChild(el('p', { class: 'hint', text: `Graph: ${graph.nodes.length} node(s), ${graph.edges.length} edge(s) shown${graph.truncated ? ' (truncated by the API limit)' : ''}.` }));
   }
   canvas.appendChild(panel);

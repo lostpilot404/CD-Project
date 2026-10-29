@@ -34,6 +34,14 @@ export const state = {
   /** Result of the last run comparison, if any. */
   comparison: null,
   /**
+   * A one-line notice for the Analyze page's status area (an example was
+   * loaded, the Rule Editor's file was moved over).  Kept in the state, not
+   * painted directly into the DOM: the hash navigation that follows those
+   * actions re-renders the view, and a directly painted notice was wiped by
+   * that very re-render before the user could read it.
+   */
+  analyzeNotice: null,
+  /**
    * Bumped by every user-initiated reset (the Clear button).  A response that
    * was in flight when the reset happened must not repopulate the interface.
    */
@@ -63,6 +71,7 @@ export function resetRun() {
     source: '',
     analysedSource: null,
     editorDirty: false,
+    analyzeNotice: null,
     statementsById: {},
     selectedFinding: null,
     selectedFindingDetail: null,
@@ -91,6 +100,7 @@ export function resetForNewRun(run, source) {
     run,
     source,
     analysedSource: source,
+    analyzeNotice: null,
     statementsById: {},
     selectedFinding: null,
     selectedFindingDetail: null,

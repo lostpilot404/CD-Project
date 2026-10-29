@@ -1,5 +1,5 @@
 {
-  "corpus_version": "1.0",
+  "corpus_version": "1.1",
   "engine_version": "1.0.0",
   "purpose": "Labelled corpus for the CodeTrace evaluation. Every case states, before the analysis is run, what the tool is expected to report. The labels are authored by hand from the source code; the harness in run_evaluation.py compares them with the actual output. Metrics computed from this file describe this corpus only.",
   "matching": "A reported finding matches an expectation when the rule id, the category, the severity, the source rule, the certainty (when the expectation declares one) and the normalised text of the sink statement all agree (finding_matches in run_evaluation.py). Line numbers are recorded for readability but are deliberately NOT part of the match, so a case still passes when an edit moves the sink down a line.",
@@ -108,6 +108,15 @@
       "expect_diagnostics": []
     },
     {
+      "file": "safe/array_element_write.ctc",
+      "label": "safe",
+      "rationale": "Writing a[i] defines that element; the base array is never read before it is written, so no use-before-assignment diagnostic may fire. A regression of the array-access fix re-introduces DFA001 here, which the forbidden-code assertion catches.",
+      "expect": [],
+      "expect_diagnostics": [],
+      "forbidden_diagnostics": ["DFA001"],
+      "analysis_complete": true
+    },
+    {
       "file": "sanitized/shell_escape.ctc",
       "label": "sanitized",
       "rationale": "shell_escape is declared for the command context and removes command taint.",
@@ -134,6 +143,14 @@
       "rationale": "The value reaches the sink only behind a declared validator guard.",
       "expect": [],
       "expect_diagnostics": []
+    },
+    {
+      "file": "sanitized/validator_boolean.ctc",
+      "label": "sanitized",
+      "rationale": "is_safe_command returns a boolean; a boolean cannot carry the command-context taint of its argument, so system(ok) must not be reported (before the taint fix this file produced two false positives). The suspicious conversion is still surfaced as SEM010, and the run is honestly marked incomplete because of that error.",
+      "expect": [],
+      "expect_diagnostics": ["SEM010"],
+      "analysis_complete": false
     },
     {
       "file": "interprocedural/return_value.ctc",
@@ -234,6 +251,14 @@
         }
       ],
       "expect_diagnostics": []
+    },
+    {
+      "file": "challenges/constant_true_else.ctc",
+      "label": "safe",
+      "rationale": "The CFG stores a false edge's condition as 'not (…)'; recognising that form is what prunes this statically impossible else branch, disclosed in dispositions.statically_pruned_branches. Before the fix the branch was analysed as live and the sink was reported. SEM102 records the int condition.",
+      "expect": [],
+      "expect_diagnostics": ["SEM102"],
+      "analysis_complete": true
     },
     {
       "file": "challenges/guarded_and_checked.ctc",

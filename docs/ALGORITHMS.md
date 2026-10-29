@@ -29,7 +29,7 @@ scan(source):
   token; identifiers are checked before keywords and keywords by table lookup.
 * **Diagnostics never abort the scan** — a bad escape or unsupported operator is
   recorded and scanning continues, so one mistake does not hide the rest.
-* Measured: the 33 corpus files lex in well under a millisecond each
+* Measured: the 36 corpus files lex in well under a millisecond each
   (0.08–0.25 ms, median ≈ 0.13 ms).
 
 ## 2. NULLABLE / FIRST / FOLLOW fixpoints
@@ -126,7 +126,9 @@ for each state i:
 ```
 
 * **Complexity:** O(states · (terminals + reduces · lookaheads)) — measured
-  2172 ACTION entries and 382 GOTO entries for 167 states and 51 terminals.
+  2172 ACTION entries and 382 GOTO entries for 167 states and 51 terminals
+  (default LALR build; the SLR build has 3 more reduce entries, 2175, because
+  it reduces on the broader global FOLLOW sets — still 0 conflicts).
 * **Determinism:** the iteration order is the production order, so two builds in
   one process (or in two processes with the same Python version) produce
   identical tables.
@@ -151,26 +153,51 @@ parse(tokens):
 * **Measured:** tokenising and parsing a 60-byte example takes ≈ 0.35 ms in
   total; parsing dominates lexing by roughly 2–3×.
 
-## 7. Error recovery (viable prefix + sync tokens)
+## 7. Error recovery (statement resync + viable prefix)
 
 ```
-recover(stack, i):
-    report SYN001 with the expected token list
-    while i < len(tokens):
-        if any state on stack can shift tokens[i]:     # viable-prefix recovery
-            unwind the stack to that state; return i
-        if tokens[i].kind in SYNC (SEMI, RBRACE) or tokens[i] is a statement start:
-            return i + 1                               # skip to a statement boundary
-        i := i + 1
-    return i
+recover(stack, values, i):
+    report SYN001 with the expected-token list    # separators first, at most
+                                                  # six names, then "(+N more)"
+    if tokens[i] is an unsupported keyword or an invalid token:
+        skip to the end of the enclosing statement (balanced ';' or '}')
+        return that position
+    if tokens[i] is EOF: return i                 # nothing left to resync to
+    j := the next ';' at relative bracket depth 0, or '}' at depth < 0,
+         at or after i                            # statement-level sync token
+    if j exists:
+        if stack can consume tokens[j]: return j  # no pop needed
+        pop (stack, values) in lockstep while no unclosed '(' / '{' / '['
+        is unwound:
+            if the popped-to stack can consume tokens[j]: return j
+    if any state on stack can SHIFT tokens[i]:    # viable-prefix recovery
+        unwind the stack to that state; return i
+    return i + 1                                  # discard the offending token
 ```
 
-* **Complexity:** O(stack depth + skipped tokens) per error, and the routine
-  always returns a strictly greater index so the parse makes progress (a fixed
-  defect in early iterations).
-* **Reporting:** the number of syntax errors, the token that failed, the
-  expected set and the recovered statement spans are all in the diagnostics and
-  the run's `partial_reasons`.
+* **"Can consume"** simulates the deterministic reduce/GOTO chain from the
+  candidate stack on the sync token and requires it to end in a shift or an
+  accept.  A raw table entry is not enough: LALR merges states from different
+  contexts, and inside `if ( a •` the merged expression state *reduces* on `;`
+  but lands in a configuration that needs `)`.  Resuming on such an entry
+  cascaded further errors instead of ending the statement cleanly.
+* **Bracket-aware popping** stops as soon as an unclosed opener would be
+  unwound: below that point the stack is no longer at statement level, and
+  resynchronising there would close someone else's bracket.
+* **Complexity:** O(stack depth + skipped tokens) per error.  At most
+  `max_errors` = 25 recoveries run (`SYN011`) and the parse loop itself is
+  bounded by a table-step budget (`SYN010`).  Every recovery either advances
+  the position or shrinks the stack, so the parse always makes progress; when
+  a step can do neither, the caller stops instead of looping.
+* **Reporting:** each recovery emits one diagnostic carrying the offending
+  token, its `line:col` and the expected-token list; when the parse needed any
+  recovery the run's `partial_reasons` says that statements were skipped.
+* **Known limitation:** resync is statement-level, so one fault *inside* a
+  compound header (`for (…)` parentheses) can emit several diagnostics: the
+  first lands on the fault, later ones on real tokens after the damaged header
+  mis-parses its remaining clauses (measured: 7 for one missing `;` in a
+  for-header, bounded by `max_errors`; statement-level separator faults stay
+  single errors — `docs/COMPILER_THEORY.md` §8).
 
 ## 8. Semantic analysis (attribute evaluation)
 
@@ -427,7 +454,7 @@ compare(before, after):
 | Slicing (per query) | O(V + E) | 0.001 ms setup |
 | Findings + explanations | O(hits · path) | 0.32 ms (0.24–0.50) |
 
-Whole corpus: 33 files in **≈1.2 s** end to end (≈ 36 ms/file, including rule
+Whole corpus: 36 files in **≈0.9 s** end to end (≈ 25 ms/file, including rule
 loading, JSON serialisation and metric collection) on this machine. Numbers are
 reported per run in `metrics.timings`; the report does not claim better
 performance than it measures, and every timing is wall-clock in this environment

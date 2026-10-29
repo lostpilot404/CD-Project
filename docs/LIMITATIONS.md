@@ -72,16 +72,24 @@ Consequences worth stating plainly:
 
 ### 1.4 Bounded work, disclosed when it bites
 
-Every analysis is capped: 1 MiB source, 2000 statement index, 4000 graph
+Every analysis is capped: 1 MiB source, 400 analysed functions per run,
+2000 statement index, 4000 graph
 nodes/edges, 5000 slice statements / 500 slice edges, 10 000 data-flow
 iterations / 200 000 steps, parser step and syntax-error limits, 2500 automaton
 states. When a cap is reached the run sets `limits_hit`, marks the analysis
 partial (`summary.analysis_complete = false`, `partial_reasons`) and says which
 cap was hit. Truncation is never silent.
 
+Syntax recovery is statement-level: one fault inside a compound header (a
+`for (…)` header, say) can produce several `SYN001` diagnostics — the first at
+the fault, later ones after the damaged header mis-parses its remaining
+clauses — bounded by the 25-error cap, with the file rejected and the run
+marked partial. Missing separators between statements stay single errors
+(`docs/COMPILER_THEORY.md` §8).
+
 ### 1.5 Coverage of the evaluation corpus
 
-The measured precision/recall figures in `docs/EVALUATION.md` describe **the 33
+The measured precision/recall figures in `docs/EVALUATION.md` describe **the 36
 hand-written `.ctc` corpus files in `examples/`**, nothing else. They are a
 regression signal for the pipeline, not an estimate of real-world detection
 quality, and the corpus is small enough that a single case moves the numbers by

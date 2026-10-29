@@ -502,6 +502,7 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
                                    "slicing is not available for this run")
                 payload = slice_result.to_json()
                 payload["statements_detail"] = self._statements_detail(program, slice_result.statements)
+                payload["statements_detail_truncated"] = len(slice_result.statements) > MAX_STATEMENT_INDEX
                 payload["subgraph"] = program.slicing.subgraph_json(slice_result.statements) if program.slicing else {}
                 self._send_json(payload)
                 return
@@ -618,6 +619,7 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
             )
             payload = slice_result.to_json()
             payload["statements_detail"] = self._statements_detail(program, slice_result.statements)
+            payload["statements_detail_truncated"] = len(slice_result.statements) > MAX_STATEMENT_INDEX
             # The slicing view draws the induced dependency subgraph, so a slice
             # taken from a statement gets the same treatment as a finding slice.
             payload["subgraph"] = program.slicing.subgraph_json(slice_result.statements)
@@ -828,7 +830,7 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
             # Statement index: id, position, text and home block.  The interface
             # needs it to offer slice criteria and to navigate to a statement
             # without asking for every statement individually.
-            "statements": self._statements_detail(program, sorted(program.statements))[:MAX_STATEMENT_INDEX],
+            "statements": self._statements_detail(program, sorted(program.statements)),
             "total_analysis_seconds": round(total, 6),
             "rules": program.rules.stats(),
             "limits_hit": list(program.limits_hit),
@@ -836,9 +838,18 @@ class CodeTraceHandler(BaseHTTPRequestHandler):
             "engine_version": ENGINE_VERSION,
         }
 
-    def _statements_detail(self, program: Program, sids) -> List[dict]:
+    def _statements_detail(self, program: Program, sids,
+                           limit: int = MAX_STATEMENT_INDEX) -> List[dict]:
+        """Per-statement rows for payload tables.
+
+        ``limit`` bounds the work: the documented statement index of the
+        analyse response lists the first ``MAX_STATEMENT_INDEX`` statements
+        (docs/API.md §7), and the slice payloads use the same bound and say
+        so with ``statements_detail_truncated`` instead of silently showing
+        fewer rows than the slice header counts.
+        """
         out: List[dict] = []
-        for sid in sids[:1000]:
+        for sid in sids[:limit]:
             node = program.statements.get(sid)
             if node is None:
                 continue

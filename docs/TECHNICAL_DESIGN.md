@@ -56,7 +56,7 @@ itself. `python3 -m codetrace.api` is the whole deployment.
 | `evaluation/` | 2 | 754 | labelled corpus harness and `expectations.json` |
 | `scripts/` | 2 | 37 | server launch and corpus evaluation |
 | `docs/` | 10 | 3149 | Markdown documentation and the project report (see `README.md`) |
-| `examples/` | 34 | 307 | 33 labelled `.ctc` sources and one example rule file |
+| `examples/` | 37 | 334 | 36 labelled `.ctc` sources and one example rule file |
 
 Total implementation: 13 043 lines of Python and rule-language source in
 `codetrace/` (40 files), 4 340 lines of frontend assets, 754 lines of evaluation

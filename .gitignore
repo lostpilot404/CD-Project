@@ -17,3 +17,6 @@ venv/
 # Runtime working directory: parser-table cache, exported reports, logs.
 # Nothing here is required to build or run the project.
 var/
+
+# Development-only frontend test tooling (frontend-tests/)
+node_modules/

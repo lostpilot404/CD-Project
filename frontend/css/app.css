@@ -14,7 +14,9 @@
   --border-subtle: #e2e8f0;
   --text: #0f172a;
   --muted: #475569;
-  --hint: #64748b;
+  /* #5b6b7f: >= 4.5:1 on both --bg and --surface (WCAG AA for the small
+     hint text); the previous #64748b measured 4.47:1 on --bg. */
+  --hint: #5b6b7f;
   --accent: #1d4ed8;
   --accent-hover: #1e40af;
   --accent-weak: #eff6ff;
@@ -54,7 +56,9 @@ body.dark {
   --border-subtle: #1e2837;
   --text: #f1f5f9;
   --muted: #94a3b8;
-  --hint: #64748b;
+  /* #8494a7: >= 4.5:1 on the dark --bg/--surface (the previous #64748b
+     measured ~4.0:1, below WCAG AA for small text). */
+  --hint: #8494a7;
   --accent: #60a5fa;
   --accent-hover: #93c5fd;
   --accent-weak: #17283c;
@@ -1022,6 +1026,37 @@ body.dark .graph-svg .node--definition rect {
 .graph-svg .node--selected rect {
   stroke: var(--accent);
   stroke-width: 2.5;
+}
+
+/* Focus: the graph was opened for one finding ("Show in Program Graph").
+   A dashed ring in the high-severity colour, distinct from the solid blue
+   click-selection, so a focused sink and a selected statement can both show. */
+.graph-svg .node--focus rect {
+  stroke: var(--high);
+  stroke-width: 3;
+  stroke-dasharray: 5 3;
+}
+
+/* Run-comparison record lists (Reports page) */
+.compare-records {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.compare-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.compare-list li {
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  background: var(--surface);
 }
 
 .graph-svg .node {

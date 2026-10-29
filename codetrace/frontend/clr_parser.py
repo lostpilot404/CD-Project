@@ -314,6 +314,60 @@ class ParseResult:
 #: Tokens that always resynchronise a panicking parser.
 _SYNC_TOKENS = {"SEMI", "RBRACE"}
 
+#: Bracket openers: a recovery pop that unwinds one of these leaves the
+#: statement level, so bracket-aware resynchronisation stops there.
+_OPENERS = ("LPAREN", "LBRACE", "LBRACKET")
+
+#: Terminals listed first in "expected one of" details.  A human reading the
+#: diagnostic needs the separators and closers first: a completed-call state
+#: has 27 actions, and an alphabetical first six (``&&, =, ,, --, ==, >=``)
+#: drops the ``;`` that is actually wanted (missing_semicolon.ctc).
+_EXPECTED_FIRST = ("SEMI", "RBRACE", "RPAREN", "RBRACKET", "COMMA", END)
+_EXPECTED_SHOWN = 6
+
+
+def _format_expected(expected: Iterable[str]) -> str:
+    """Human-readable expected-terminal list: separators first, then a tail."""
+    ordered = [t for t in _EXPECTED_FIRST if t in expected]
+    ordered += [t for t in expected if t not in _EXPECTED_FIRST]
+    if not ordered:
+        return "nothing (the parser cannot continue from this state)"
+    shown = ", ".join(
+        "end of file" if t == END else display_kind(t) for t in ordered[:_EXPECTED_SHOWN]
+    )
+    if len(ordered) > _EXPECTED_SHOWN:
+        shown += f" (+{len(ordered) - _EXPECTED_SHOWN} more)"
+    return shown
+
+
+def _find_sync_token(stream: Sequence[Token], pos: int) -> Optional[int]:
+    """Index of the next statement-level ``;`` or ``}`` at or after ``pos``.
+
+    Bracket depth is tracked *relative to the error position* so that a
+    separator inside brackets opened after the error is not mistaken for the
+    end of the enclosing statement.  A ``;`` counts at relative depth 0; a
+    ``}`` counts at negative depth, where it closes a bracket that contains
+    the error position (or the block itself, at statement level).  ``None``
+    when no such token exists before end of file.
+    """
+    depth = 0
+    for idx in range(pos, len(stream)):
+        kind = stream[idx].kind
+        if kind == EOF:
+            return None
+        if kind in _OPENERS:
+            depth += 1
+        elif kind in ("RPAREN", "RBRACE", "RBRACKET"):
+            depth -= 1
+        if kind not in _SYNC_TOKENS:
+            continue
+        if kind == "SEMI":
+            if depth == 0:
+                return idx
+        elif depth < 0:
+            return idx
+    return None
+
 
 TYPE_KEYWORDS = frozenset({"KW_INT", "KW_FLOAT", "KW_CHAR", "KW_BOOL", "KW_STRING"})
 
@@ -370,6 +424,44 @@ class LRParser:
         for state in state_stack:
             viable |= self._shift_terminals.get(state, set())
         return viable
+
+    #: Bound on the simulated reduce/GOTO chain in :meth:`_consumes`.  Real
+    #: chains here are shorter than ten; the bound only guards against a
+    #: pathological table producing an epsilon-reduce cycle.
+    _MAX_REDUCE_CHAIN = 64
+
+    def _consumes(self, state_stack: Sequence[int], terminal: str) -> bool:
+        """Whether the parser can eventually shift (or accept) ``terminal``.
+
+        ``ACTION[top, terminal]`` alone is not enough: LALR merges states from
+        different contexts, so a REDUCE entry can be legal only in *another*
+        context.  Inside ``if ( a •`` the merged expression state reduces
+        ``primary -> IDENT`` on a ``;`` lookahead, but the configuration the
+        reduction lands in expects ``)``; resuming at that ``;`` would be a
+        dead end that cascades further errors.  Follow the deterministic
+        reduce/GOTO chain instead and require that it ends in SHIFT or ACCEPT.
+        """
+        stack = list(state_stack)
+        for _ in range(self._MAX_REDUCE_CHAIN):
+            if not stack:
+                return False
+            action = self.tables.action.get((stack[-1], terminal))
+            if action is None:
+                return False
+            if action.kind in (SHIFT, ACCEPT):
+                return True
+            if action.kind != REDUCE:
+                return False
+            production = self.tables.grammar.productions[action.value]
+            if len(production.rhs):
+                del stack[-len(production.rhs):]
+            if not stack:
+                return False
+            goto_state = self.tables.goto.get((stack[-1], production.lhs))
+            if goto_state is None:
+                return False
+            stack.append(goto_state)
+        return False
 
     def parse(self, tokens: Sequence[Token], source: str = "") -> ParseResult:
         grammar = self.tables.grammar
@@ -536,9 +628,7 @@ class LRParser:
         expected = sorted(
             {t for (s, t), a in self.tables.action.items() if s == state and a.kind in (SHIFT, ACCEPT, REDUCE)}
         )
-        expected_txt = ", ".join(
-            "end of file" if t == END else display_kind(t) for t in expected[:6]
-        ) or "nothing (the parser cannot continue from this state)"
+        expected_txt = _format_expected(expected)
 
         if token.kind == "UNSUPPORTED_KW":
             code, message = "SYN100", f"unsupported construct: keyword '{token.text}'"
@@ -607,7 +697,32 @@ class LRParser:
         if token.kind == EOF:
             return (pos, False)
 
-        # 2) Standard viable-prefix recovery: if the lookahead can be shifted
+        # 2) Statement-level resynchronisation: resume at the next balanced
+        #    ';' or '}' when the current configuration -- or one reachable by
+        #    popping without unwinding an unclosed bracket -- can consume it.
+        #    One missing ';' stays one error this way.  The viable-prefix pop
+        #    below alone would find a state deep inside the broken construct,
+        #    reinterpret the *following* statement in that wrong context and
+        #    cascade a second SYN001 (missing_semicolon.ctc reported twice).
+        sync_pos = _find_sync_token(stream, pos)
+        if sync_pos is not None:
+            sync_kind = stream[sync_pos].kind
+            if self._consumes(state_stack, sync_kind):
+                return (sync_pos, False)
+            trial_states = list(state_stack)
+            trial_values = list(value_stack)
+            while len(trial_states) > 1:
+                top_value = trial_values.pop() if trial_values else None
+                trial_states.pop()
+                if isinstance(top_value, Token) and top_value.kind in _OPENERS:
+                    break  # unwound an unclosed bracket: no statement level below
+                if self._consumes(trial_states, sync_kind):
+                    del state_stack[len(trial_states):]
+                    del value_stack[len(trial_values):]
+                    stats.max_stack_depth = max(stats.max_stack_depth, len(state_stack))
+                    return (sync_pos, True)
+
+        # 3) Standard viable-prefix recovery: if the lookahead can be shifted
         #    from some state on the stack, pop until that state is on top.
         viable = self._viable_terminals(state_stack)
         if terminal in viable and len(state_stack) > 1:
@@ -622,7 +737,7 @@ class LRParser:
                     return (pos, True)
             return (pos, True)
 
-        # 3) Otherwise discard the offending token and continue.
+        # 4) Otherwise discard the offending token and continue.
         if pos < len(stream) - 1:
             return (pos + 1, False)
         return (pos, False)

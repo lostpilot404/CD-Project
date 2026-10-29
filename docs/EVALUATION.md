@@ -30,18 +30,18 @@ scripts/evaluate.sh                             # same, JSON written to var/eval
 * The corpus is **independent of the engine internals**: the labels describe what a
   reader of the C source expects, not what the current code happens to print.
 
-### Corpus contents (corpus_version 1.0, 33 cases, 20 expected findings)
+### Corpus contents (corpus_version 1.1, 36 cases, 20 expected findings)
 
 | Label | Cases | What it covers |
 | --- | --- | --- |
 | `vulnerable` | 17 | direct flows, multiple assignments, expressions, branch-taken flows, helpers, argument/return flows, multiple sources and sinks, loop-carried taint, array-element taint, unknown externals that keep taint, wrong-context sanitisers, sink-looking text in comments and strings, a negated validator guard, a shadowed variable |
-| `safe` | 5 | constant to sink, unrelated tainted variable, a source that never reaches the sink, a sink in a statically dead branch, taint killed by a later constant |
-| `sanitized` | 4 | `shell_escape`, `sql_escape`, `to_int` (all contexts) and a validator guard (see §2.1) |
+| `safe` | 7 | constant to sink, unrelated tainted variable, a source that never reaches the sink, a sink in a statically dead branch, taint killed by a later constant, a fully written array element (no use-before-assignment), a sink in the statically impossible `else` of a constant-true condition |
+| `sanitized` | 5 | `shell_escape`, `sql_escape`, `to_int` (all contexts), a validator guard (see §2.1) and a validator that returns a boolean — a `bool` cannot carry the taint of its argument, and the suspicious conversion is still surfaced as `SEM010` |
 | `unsupported` | 3 | `switch`, a preprocessor directive, pointer syntax — each must produce an explicit diagnostic |
 | `syntax_error` | 3 | missing semicolon, unbalanced braces, broken expression — each must produce `SYN001` and a partial-analysis flag |
 | `custom_rule` | 1 | a program analysed with a user rule file from `examples/custom_rules/strict_rules.ctrule` |
 
-## 2. Per-case accounting (why 33 files are not 33 precision measurements)
+## 2. Per-case accounting (why 36 files are not 36 precision measurements)
 
 The corpus mixes three kinds of case, and they enter the metrics differently. The
 three groups are disjoint and together account for every file in the corpus:
@@ -49,10 +49,10 @@ three groups are disjoint and together account for every file in the corpus:
 | Group | Files | Enters which metric | Second requirement |
 | --- | --- | --- | --- |
 | finding-level | 18 | TP/FN for each declared expectation (`20` in total) | no extra finding |
-| file-level | 9 | file-level TN/FP for `safe` and `sanitized` | no finding at all |
+| file-level | 12 | file-level TN/FP for `safe` and `sanitized` | no finding at all |
 | diagnostic-only | 6 | no precision/recall denominator | the declared diagnostic codes must appear, and no finding may appear |
 
-**18 + 9 + 6 = 33.** Only the first two groups carry a
+**18 + 12 + 6 = 36.** Only the first two groups carry a
 precision/recall/specificity denominator; the 6 `unsupported` and `syntax_error`
 cases are deliberately outside it, because a program that is rejected before
 analysis is not a detection opportunity and counting it as a true negative would
@@ -72,15 +72,18 @@ expectation` for **every** case, not only for cases that declare expectations.
 | `safe/unrelated_variable.ctc` | safe | 0 | file-level TN/FP + FP | must report no finding |
 | `safe/source_never_reaches_sink.ctc` | safe | 0 | file-level TN/FP + FP | must report no finding |
 | `safe/dead_branch_sink.ctc` | safe | 0 | file-level TN/FP + FP | must report no finding |
+| `safe/array_element_write.ctc` | safe | 0 | file-level TN/FP + FP | must report no finding; `DFA001` is forbidden |
 | `sanitized/shell_escape.ctc` | sanitized | 0 | file-level TN/FP + FP | must report no finding |
 | `sanitized/sql_escape.ctc` | sanitized | 0 | file-level TN/FP + FP | must report no finding |
 | `sanitized/parse_to_int.ctc` | sanitized | 0 | file-level TN/FP + FP | must report no finding |
 | `sanitized/validated_command.ctc` | sanitized | 0 | file-level TN/FP + FP | must report no finding |
+| `sanitized/validator_boolean.ctc` | sanitized | 0 | file-level TN/FP + FP | must report no finding; must report `SEM010`; the run is honestly flagged incomplete |
 | `interprocedural/return_value.ctc` | vulnerable | 1 | TP/FN (1 expectation) + FP | — |
 | `interprocedural/argument_flow.ctc` | vulnerable | 1 | TP/FN (1 expectation) + FP | — |
 | `interprocedural/recursion.ctc` | vulnerable | 1 | TP/FN (1 expectation) + FP | — |
 | `challenges/wrong_context_sanitizer.ctc` | vulnerable | 2 | TP/FN (2 expectations) + FP | — |
 | `challenges/unknown_external_keeps_taint.ctc` | vulnerable | 1 | TP/FN (1 expectation) + FP | — |
+| `challenges/constant_true_else.ctc` | safe | 0 | file-level TN/FP + FP | must report no finding; must report `SEM102`; the impossible branch is pruned and disclosed |
 | `challenges/array_element_taint.ctc` | vulnerable | 1 | TP/FN (1 expectation) + FP | — |
 | `challenges/guarded_and_checked.ctc` | vulnerable | 1 | TP/FN (1 expectation) + FP | — |
 | `challenges/multiple_sources_two_sinks.ctc` | vulnerable | 2 | TP/FN (2 expectations) + FP | — |
@@ -159,6 +162,16 @@ syntax cases, a minimum number of `SYNxxx` diagnostics), and no *unexpected*
 error-severity diagnostic may appear. This is how malformed and unsupported input
 is verified: it must be reported, not ignored.
 
+**Forbidden diagnostics** — a case may declare `forbidden_diagnostics`; the case
+fails if a diagnostic with any of those codes appears, even when every declared
+expectation is satisfied. This turns known past false positives (a spurious
+`DFA001` on array-element writes) into permanent corpus assertions.
+
+**Analysis completeness** — a case may declare `analysis_complete`; the harness
+compares it with the run's `analysis_complete` flag, so a case can never pass
+because the engine silently bailed out early, and a run that is honestly marked
+incomplete (e.g. after a declared `SEM010` error) is not required to be complete.
+
 **Zero denominators** are handled explicitly rather than papered over:
 `ratio()` returns `null` plus a note such as *"no findings were reported in this
 corpus"* when the denominator is 0, and F1 is `null` when both precision and
@@ -171,13 +184,13 @@ Date of the run recorded in the JSON (`evaluated_at`), engine 1.0.0, rules
 `builtin-3387b7dcd97a95f3`:
 
 ```
-cases                33        cases passed        33        cases failed  0
+cases                36        cases passed        36        cases failed  0
 expected findings    20        reported findings   20
 true positives       20        false positives      0        false negatives 0
-file-level TN         9        file-level FP        0        (9 safe/sanitized cases)
+file-level TN        12        file-level FP        0        (12 safe/sanitized cases)
 diagnostic mismatches 0
 precision 1.0                 recall 1.0                    F1 1.0
-analysis time: 1.14 s for 33 files (median 10 ms, first case 0.79 s incl. table build)
+analysis time: 0.83 s for 36 files
 environment: Python 3.11.2, Linux x86_64, 2 processors
 ```
 
@@ -186,7 +199,7 @@ rather than remembered: `python3 evaluation/run_evaluation.py; echo $?` prints 0
 today and would print 1 after any regression.
 
 Wall-clock figures vary with the machine and with what else is running: the same
-corpus has measured between 0.8 s and 1.3 s here across runs, which is why the
+corpus has measured between 0.8 s and 1.0 s here across runs, which is why the
 per-case times and the environment are written into
 `var/evaluation.json` (`evaluated_at`, `analysis_seconds`, `environment`) instead
 of being quoted as a fixed result. Every other number above is deterministic for
@@ -195,7 +208,7 @@ a given corpus and engine version.
 ## 5. What these numbers mean — and what they do not
 
 They mean: **on this corpus, with this rule set, every one of the 20 declared
-expectations (in 18 files) is reported exactly once, none of the 9 `safe` /
+expectations (in 18 files) is reported exactly once, none of the 12 `safe` /
 `sanitized` files produces a finding, no file in the corpus produces an undeclared
 finding, and every malformed or unsupported file produces the diagnostic it is
 supposed to produce.** The `safe` and
@@ -208,11 +221,11 @@ They do **not** mean:
 * that precision, recall or F1 generalise, or that "100 %" describes anything
   other than this corpus. The recall denominator is 20 expectations, all of them
   written for this project; the precision denominator is those 20 findings plus
-  whatever the engine reports on the other 13 files, and the specificity
-  denominator is 9 files. The 6 `unsupported` / `syntax_error` files are outside
+  whatever the engine reports on the other 12 files, and the specificity
+  denominator is 12 files. The 6 `unsupported` / `syntax_error` files are outside
   all three by construction (§2);
 * that CodeTrace detects 100 % of command injection in real C programs — the
-  corpus is 33 hand-written files written for this project;
+  corpus is 36 hand-written files written for this project;
 * that precision or recall would stay at 1.0 on arbitrary code: the corpus has
   no large functions, no macros, no aliasing and no library-heavy code, all of
   which the analysis handles approximately or not at all
@@ -232,7 +245,7 @@ To add a case:
 2. add an entry to `evaluation/expectations.json` with `file`, `label`,
    `rationale`, `expect` (rule, category, severity, `sink_statement`,
    `source_rule`), `expect_diagnostics` (codes) and, when needed,
-   `min_syntax_errors` or `rules`;
+   `min_syntax_errors`, `forbidden_diagnostics`, `analysis_complete` or `rules`;
 3. run `python3 evaluation/run_evaluation.py` — a mismatch is reported with the
    case, the missing expectation and the unexpected finding, and the harness
    exits 1.
