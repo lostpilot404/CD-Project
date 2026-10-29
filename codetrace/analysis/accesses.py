@@ -81,10 +81,18 @@ def lvalue_accesses(node: Node) -> Accesses:
     if isinstance(node, Ident):
         return (set(), {node.symbol_id}) if node.symbol_id >= 0 else _NO_ACCESS
     if isinstance(node, Index):
-        # The array symbol is written; the index expression is read.
-        _base_reads, base_writes = lvalue_accesses(node.base)
+        # The array symbol is written; the index expression is read.  The base
+        # is *not* a read here: ``a[i] = v`` overwrites one element and never
+        # consults the previous contents of ``a``.  (A compound assignment such
+        # as ``a[i] += v`` does read the target as well; that is added by
+        # ``_assignment_accesses`` below, which unions the writes into the
+        # reads for every operator except plain ``=``.)  Counting the base as a
+        # read made definite assignment report ``int a[4]; a[0] = 1;`` as a use
+        # of an uninitialised variable and made liveness keep ``a`` alive
+        # across the write.
+        base_reads, base_writes = lvalue_accesses(node.base)
         index_reads, index_writes = expression_accesses(node.index)
-        return base_writes | index_reads, base_writes | index_writes
+        return base_reads | index_reads, base_writes | index_writes
     # Anything else is not a valid lvalue in this subset; treat it as a read so
     # that no spurious write is invented (semantic analysis reports the error).
     return expression_accesses(node)

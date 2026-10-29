@@ -226,6 +226,14 @@ def analyse_source(
         cfg_started = time.perf_counter()
         statements = assign_statement_ids(tree)
         cfgs = build_cfgs(tree, statements)
+        if len(cfgs) > MAX_FUNCTIONS:
+            # The limits message above promises that only the first
+            # MAX_FUNCTIONS functions are analysed, so the CFG map is actually
+            # truncated to that declaration-order prefix here.  Everything
+            # downstream (data-flow, taint, findings, the summary's function
+            # list) iterates ``cfgs`` and therefore honours the cap instead of
+            # silently analysing all of them.
+            cfgs = {name: cfgs[name] for name in list(cfgs)[:MAX_FUNCTIONS]}
         # Semantic analysis runs before statement ids exist, so the call sites
         # it recorded are linked to their statements here: the innermost
         # statement whose span contains the call is the statement that performs
@@ -323,6 +331,23 @@ def analyse_source(
         partial_reasons.append(
             f"{len(unsupported)} construct(s) are outside the supported language subset and were "
             "not analysed: " + "; ".join(sorted({d.message for d in unsupported})[:3])
+        )
+    # An error-severity lexer diagnostic (a malformed literal that had to be
+    # repaired or skipped, for instance) means the token stream the parser saw
+    # is not exactly what the file says.  Unsupported constructs are already
+    # counted above; what remains makes the run partial even when the parser
+    # itself accepted the repaired stream.
+    lex_errors = [
+        d for d in parse.diagnostics
+        if d.severity == "error" and not getattr(d, "unsupported", False)
+        and getattr(d, "phase", "lexer") == "lexer"
+    ]
+    if lex_errors:
+        partial_reasons.append(
+            f"{len(lex_errors)} lexer error(s) were reported ("
+            + "; ".join(sorted({d.code for d in lex_errors})[:4])
+            + "): the token stream was repaired before parsing, so the analysis "
+            "may not reflect the file exactly"
         )
     # An error-severity semantic diagnostic (for example an undeclared
     # identifier or an argument of the wrong type) means the program would not

@@ -1,4 +1,5 @@
-// expect: 1 finding, rule command_execution, certainty unproven (recursion limit reached)
+// expect: 1 finding, rule command_execution, certainty approximate (recursion is
+// summarised with a bounded fixpoint, so the flow is reported but not confirmed)
 string repeat(string value, int times) {
   if (times <= 0) {
     return value;

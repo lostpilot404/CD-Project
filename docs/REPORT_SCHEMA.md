@@ -23,7 +23,7 @@ generated on demand and never stored on disk by the server.
 | `findings` | array | the findings (§2) |
 | `diagnostics` | array | every diagnostic: `code`, `severity`, `message`, `line`, `col`, `phase`, `detail` |
 | `unsupported` | object | `offsets` and `features` (deduplicated descriptions) of constructs outside the subset |
-| `unknown_values` | array | values the analysis could not determine (kept empty rather than guessed) |
+| `unknown_values` | array | values the analysis could not determine (kept empty rather than guessed); the first 200 entries are listed |
 | `analysis` | object | `order` (the pipeline stages that ran), `functions` (per-function CFG and fixpoint statistics), `taint` (engine version, iterations, convergence, per-function summaries, infeasible branches, notes), `dependency_graph` (node/edge counts and edge kinds) |
 | `metrics` | object | measured counts and per-phase timings (§3) |
 | `notes` | array | the run's own notes (engine version of each analysis stage, context-insensitivity, cleared guard atoms, iteration limits) |

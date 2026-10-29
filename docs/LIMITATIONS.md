@@ -72,7 +72,8 @@ Consequences worth stating plainly:
 
 ### 1.4 Bounded work, disclosed when it bites
 
-Every analysis is capped: 1 MiB source, 2000 statement index, 4000 graph
+Every analysis is capped: 1 MiB source, 400 analysed functions per run,
+2000 statement index, 4000 graph
 nodes/edges, 5000 slice statements / 500 slice edges, 10 000 data-flow
 iterations / 200 000 steps, parser step and syntax-error limits, 2500 automaton
 states. When a cap is reached the run sets `limits_hit`, marks the analysis

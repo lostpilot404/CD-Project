@@ -115,6 +115,13 @@ class DefiniteAssignment(DataFlowProblem):
             for statement in block.statements:
                 reads, writes = statement_accesses(statement, initialisation_only=True)
                 for symbol_id in sorted(reads):
+                    if symbol_id not in self.symbol_names:
+                        # Not a data-flow symbol: a function name used as a
+                        # value (``int x = main;``, reported as SEM014) or
+                        # another entity the domain does not track.  Naming it
+                        # "variable ?" would be noise on top of the semantic
+                        # error that already explains the misuse.
+                        continue
                     atom = symbol_atom(symbol_id, self.symbol_names.get(symbol_id, ""))
                     if not self.domain.contains(value, atom):
                         findings.append(

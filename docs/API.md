@@ -205,6 +205,8 @@ derived from the flow, not from line numbers, so a formatting change reports
 | rule file size | 524 288 bytes | `413 rules-too-large` |
 | unknown statement id | — | `404 statement-not-found` (`/statements/{sid}`); a non-integer `sid` is `400 invalid-parameter` |
 | statement index in the analyse response | first 2000 statements | the list is truncated; every statement stays addressable by `sid` |
+| functions analysed per run | first 400 declared functions | `limits_hit` names the cap; the remaining functions are not analysed |
+| `statements_detail` in slice payloads | first 2000 statements | `statements_detail_truncated: true`; the slice's own `statements` list stays complete |
 | graph payload | `limit` ≤ 4000 nodes/edges | `truncated: true` in the payload |
 | slice size | 5000 statements, 500 edges | `truncated: true`, note in the slice |
 | data-flow fixpoint | 10 000 iterations / 200 000 steps | `converged: false` and a partial-analysis note |

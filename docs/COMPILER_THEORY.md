@@ -15,7 +15,7 @@ every claim points at the file that produces it.
 | LALR(1) merging | §5 | `merge_lalr_states` |
 | SLR(1) | §6 | `build_lr0_automaton` + FOLLOW |
 | ACTION/GOTO tables, conflicts | §7 | `codetrace/frontend/clr_parser.py` |
-| LR parsing + error recovery | §8 | `CLRParser.parse` |
+| LR parsing + error recovery | §8 | `LRParser.parse` |
 | Syntax-directed translation → AST | §9 | `codetrace/frontend/ast_nodes.py` |
 | Attribute grammars, symbol tables, types | §10 | `codetrace/semantics/` |
 | Control-flow graphs | §11 | `codetrace/analysis/cfg.py` |
@@ -240,10 +240,13 @@ matters.
 **How.** Same LR(0) automaton as LALR; the table builder substitutes
 `LA(I, A → α) = FOLLOW(A)`.
 
-**Worked example (measured).** `slr` mode: 167 states, 0 conflicts, 2172 ACTION entries —
-identical to LALR here, because CT-C subset v1 happens to be SLR(1). An ambiguous
-expression grammar reports its conflict instead of hiding it, which is the honest way to
-demonstrate the difference.
+**Worked example (measured).** `slr` mode: 167 states, 0 conflicts, **2175** ACTION
+entries and 382 GOTO entries — the same automaton as LALR (both are LR(0)-based) but
+three more reduce entries, because SLR reduces on the global `FOLLOW(A)`, which here is
+slightly broader than the exact per-state LALR lookaheads (LALR: 2172 entries). The extra
+entries create no conflict, so CT-C subset v1 parses identically under both modes. An
+ambiguous expression grammar reports its conflict instead of hiding it, which is the
+honest way to demonstrate the difference.
 
 **Implementation and limits.** `build_lr0_automaton` + the `slr` branch of `build_tables`.
 Limit: SLR resolves less than LR(1); the project therefore ships LALR as the default
@@ -319,27 +322,49 @@ for each token a:
     else:                           error recovery
 ```
 
-Error recovery has three parts, in order:
+Error recovery (`_report_and_recover`) applies four strategies, in order:
 
-1. **Viable-prefix recovery** (`_report_and_recover`): if any state on the stack
-   can shift the offending token, unwind to it and continue — the classic
-   "discard until a shift is possible".
-2. **Sync-token skipping**: otherwise skip tokens until one that can follow the
-   current statement (typically `;` or `}`), then continue. The routine returns
-   the *new position* so recovery always makes progress (a fixed bug: without
-   that, identical errors repeated forever).
-3. **Limits**: at most `MAX_SYNTAX_ERRORS` diagnostics, and a step limit
-   `SYN010`/`SYN011`. When a limit is hit the parse is marked partial and the
-   report says so in `summary.partial_reasons`.
+1. **Statement skip for unsupported constructs**: an unsupported keyword
+   (`SYN100`) or a stray invalid token skips the whole statement — to the next
+   balanced `;` or `}` — so one unsupported construct does not cascade into
+   spurious errors. End of file ends the parse.
+2. **Statement-level resynchronisation**: resume at the next `;` (relative
+   bracket depth 0) or `}` (depth < 0) when the current stack — or one reached
+   by popping without unwinding an unclosed bracket — *can consume* that token.
+   "Can consume" simulates the deterministic reduce/GOTO chain and requires it
+   to end in a shift or accept: a raw LALR table entry is not enough, because
+   merged states offer reductions that are legal only in another context
+   (inside `if ( a •` the expression state reduces on `;` but lands where `)`
+   is needed). This strategy is what keeps one missing `;` **one** error: a
+   viable-prefix pop alone finds a state inside the broken construct,
+   reinterprets the *following* statement there and reports a second error.
+3. **Viable-prefix recovery**: if any state on the stack can shift the
+   offending token, unwind to it and continue — the classic "discard until a
+   shift is possible".
+4. **Token discard**: otherwise skip the offending token and retry.
 
-**Worked example.** `int main() { int a = ; return 0; }` yields exactly one
-`SYN001` at the `;` with `expected: IDENT, INT_LIT, …` and the parser recovers to
-parse the `return`; `examples/syntax_errors/*.ctc` are the labelled corpus cases
-for this. A `switch` keyword produces `LEX100` + `SYN100` and the statement is
-skipped, never silently ignored.
+**Limits**: at most `max_errors` = 25 recoveries (`SYN011`) and a table-step
+budget (`SYN010`). When a limit is hit the parse stops, and the report says so
+in `summary.partial_reasons`. Every recovery either advances the position or
+shrinks the stack, so the parse always makes progress; when a step can do
+neither, the caller stops instead of looping forever.
 
-**Implementation and limits.** `CLRParser.parse`. Limit: recovery is heuristic — the report
-states which statements were skipped rather than pretending the file parsed.
+**Worked examples (measured).** `int main() { int a = ; return 0; }` yields
+exactly one `SYN001` at the `;` (`expected: character literal, --, float
+literal, identifier, ++, integer literal (+6 more)`); the stack pops to the
+declarator level, where the `;` completes `int a;`, and the `return` parses.
+A missing separator between statements — `string name = input()` directly
+followed by `system(name);` — likewise yields exactly one `SYN001`, at the
+offending identifier (`expected: ;, ), ], ,, &&, = (+21 more)`: separators
+first, because the truncated alphabetical list used to hide the `;` that was
+actually wanted); the parser resumes at the next balanced `;`.
+`examples/syntax_errors/*.ctc` are the labelled corpus cases for this. A
+`switch` keyword produces `LEX100` + `SYN100` and the statement is skipped,
+never silently ignored.
+
+**Implementation and limits.** `LRParser.parse` / `LRParser._report_and_recover`.
+Limit: recovery is heuristic — the report states which statements were skipped
+rather than pretending the file parsed.
 
 ---
 

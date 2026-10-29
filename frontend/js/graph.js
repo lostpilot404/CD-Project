@@ -45,7 +45,8 @@ export function renderLegend() {
  * Render a graph.
  *
  * @param {object} graph  `{nodes, edges, truncated, limit}` as returned by the API
- * @param {object} options `{onSelect, selectedId, maxNodes, kinds, emptyMessage}`
+ * @param {object} options `{onSelect, selectedId, focusIds, maxNodes, kinds, emptyMessage}`;
+ *   `focusIds` is a Set (or array) of node ids to highlight with the focus ring
  */
 export function renderGraph(graph, options = {}) {
   const container = el('div');
@@ -79,6 +80,11 @@ export function renderGraph(graph, options = {}) {
 
 function buildSvg(nodes, edges, options) {
   const { edges: drawn, dropped } = selectEdges(edges, { kinds: options.kinds || null, limit: options.edgeLimit || 2000 });
+  // Node ids highlighted because the view was opened for one finding (its sink
+  // statement): a ring distinct from the click-selection so both can show.
+  const focusIds = options.focusIds instanceof Set
+    ? options.focusIds
+    : new Set(options.focusIds || []);
   const { positions, width, height } = layoutGraph(nodes, drawn, options.layout || {});
   const root = svg('svg', {
     class: 'graph-svg',
@@ -134,7 +140,7 @@ function buildSvg(nodes, edges, options) {
     const shortened = shortenLabel(node.label, 26);
     const subText = `line ${node.line}${node.symbol ? ` · ${node.symbol}` : ''}`;
     const group = svg('g', {
-      class: `node node--${node.kind}${options.selectedId === node.id ? ' node--selected' : ''}`,
+      class: `node node--${node.kind}${options.selectedId === node.id ? ' node--selected' : ''}${focusIds.has(node.id) ? ' node--focus' : ''}`,
       tabindex: '0',
       role: 'button',
       // The drawn text is the concatenation of the two <text> nodes and axe compares

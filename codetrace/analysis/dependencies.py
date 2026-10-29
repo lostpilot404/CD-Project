@@ -469,13 +469,11 @@ def add_source_sink_edges(program) -> int:
 
     The findings are produced after the graph is built (they summarise the
     analyses that run over it), so the edges are appended here, once the paths
-    exist.  They are ordinary graph edges: they take part in the edge-kind
-    filters and in the subgraph a slice induces, so the slicing view shows the
-    route through the same edges the graph view draws.
-
-    ``source-to-sink`` edges are *not* part of the backward/forward slice
-    traversal's justification: a slice's membership is decided by the data,
-    control, call, return and define edges it follows, exactly as before.
+    exist.  They are ordinary graph edges in every respect: they take part in
+    the edge-kind filters, in the subgraph a slice induces, and in the slice
+    traversal itself -- ``slicing.SLICE_KINDS`` lists ``source-to-sink``, so a
+    backward or forward slice follows reported flows like any other relation
+    and its reasons cite them when a statement joins the slice that way.
     """
     graph = program.dependencies
     if graph is None:

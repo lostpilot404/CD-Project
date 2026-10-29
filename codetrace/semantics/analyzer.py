@@ -166,7 +166,6 @@ class SemanticAnalyzer:
         self.functions: Dict[str, FunctionDecl] = {}
         self.unsupported_offsets: List[int] = []
         self.unknowns: List[dict] = []
-        self._unresolved_calls: Dict[str, str] = {}
         self.global_scope = self.table.root
         self.current_function: Optional[FunctionDecl] = None
         self.current_function_scope = self.global_scope
@@ -730,10 +729,10 @@ class SemanticAnalyzer:
             )
             return
 
-        # Unknown external function: reported once per name, modelled
-        # conservatively by the taint engine.
+        # Unknown external function: reported at every call site (the same
+        # unknown name may be called many times and each call is a place the
+        # analysis had to guess), modelled conservatively by the taint engine.
         call.resolution = "unknown"
-        self._unresolved_calls.setdefault(name, "unknown")
         self.diagnostic(
             "warning", "SEM008",
             f"call to unknown function '{name}'",

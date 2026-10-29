@@ -73,6 +73,7 @@ from ..frontend.ast_nodes import (
     WhileStmt,
 )
 from ..rules.model import CONTEXTS, ALL_CONTEXTS, RuleSet, SanitizerRule, SinkRule, SourceRule
+from ..semantics.externals import lookup as external_lookup
 from .accesses import statement_accesses
 from .cfg import CFG, BasicBlock, expression_text
 from .dataflow import BitVectorDomain, DataFlowProblem, DataFlowResult, solve
@@ -115,6 +116,44 @@ def atom_origin(atom: str) -> Tuple[str, str]:
     head, _, _context = atom.partition("@")
     kind, _, name = head.partition(":")
     return kind, name
+
+
+#: Literal texts that decide a branch condition statically.
+_CONSTANT_FALSE = ("false", "0")
+_CONSTANT_TRUE = ("true", "1")
+
+
+def statically_impossible_edge(edge) -> Optional[str]:
+    """Why a ``true``/``false`` branch edge can never be taken, else ``None``.
+
+    The CFG builder records a true edge's condition as the source text and a
+    *false* edge's condition as ``not (source text)`` (see
+    :mod:`codetrace.analysis.cfg`).  A true edge is therefore impossible when
+    its condition is a constant falsity (``false``/``0``), and a false edge is
+    impossible when the condition *inside* the ``not (...)`` wrapper is a
+    constant truth (``true``/``1``) -- ``if (1) {...} else {...}`` gives the
+    else edge the condition ``not (1)``.  Matching only the raw text (the
+    previous behaviour) never recognised a false edge, so statically dead
+    ``else`` branches were analysed and reported as if they could run, and
+    were missing from the pruned-branch disclosure.
+
+    The returned string is the disclosure reason used by the reports; both the
+    pruning check and the disclosure report call this one function so they can
+    never disagree about which edges are impossible.
+    """
+    if edge.kind not in ("true", "false"):
+        return None
+    condition = edge.condition.strip()
+    if edge.kind == "true":
+        if condition in _CONSTANT_FALSE:
+            return f"condition '{condition}' is a constant that makes this branch impossible"
+        return None
+    inner = condition
+    if inner.startswith("not (") and inner.endswith(")"):
+        inner = inner[len("not ("):-1].strip()
+    if inner in _CONSTANT_TRUE:
+        return f"condition '{inner}' is a constant that makes this branch impossible"
+    return None
 
 
 # ----------------------------------------------------------------------
@@ -355,13 +394,12 @@ class TaintProblem(DataFlowProblem):
                     self.infeasible_edges.add((block.id, edge.dst))
 
     def _is_constant(self, edge) -> bool:
-        """A branch whose condition is a literal is decided statically."""
-        condition = edge.condition.strip()
-        if edge.kind == "true" and condition in ("false", "0"):
-            return True
-        if edge.kind == "false" and condition in ("true", "1"):
-            return True
-        return False
+        """A branch whose condition is a literal is decided statically.
+
+        Delegates to :func:`statically_impossible_edge`, which understands the
+        ``not (...)`` form the CFG gives false edges.
+        """
+        return statically_impossible_edge(edge) is not None
 
     def _guard_on_edge(self, block: BasicBlock, edge) -> Tuple[List[Tuple[int, str]], List[dict]]:
         """Validator guards carried by an ``if``/``while`` condition.
@@ -778,13 +816,14 @@ class TaintEngine:
         for name, cfg in self.program.cfgs.items():
             for block in cfg.sorted_blocks():
                 for edge in block.successors:
-                    if edge.condition.strip() in ("false", "0") and edge.kind == "true":
+                    reason = statically_impossible_edge(edge)
+                    if reason is not None:
                         out.append(
                             {
                                 "function": name,
                                 "from": block.id,
                                 "to": edge.dst,
-                                "reason": f"condition '{edge.condition}' is a constant that makes this branch impossible",
+                                "reason": reason,
                             }
                         )
         return out
@@ -1008,20 +1047,26 @@ class TaintEngine:
 
         # 3) sanitizer -----------------------------------------------------
         if sanitizers:
-            base = 0
-            for atoms in argument_atoms:
-                base |= atoms
-            for sanitizer in sanitizers:
-                if sanitizer.argument >= len(call.args):
-                    continue
-                if sanitizer.kind == "validator":
-                    # A validator used as a value yields a boolean, which
-                    # carries no string taint.
-                    result_atoms |= 0
-                    continue
-                selected = argument_atoms[sanitizer.argument]
-                base = (base & ~selected) | self._remove_context(problem, selected, sanitizer.context)
-            result_atoms |= base
+            non_validators = [s for s in sanitizers if s.kind != "validator"]
+            if not non_validators:
+                # Every rule for this name is a validator: used as a value it
+                # yields a boolean, which carries no taint from its arguments.
+                # Unioning the argument atoms into the result here (the
+                # previous behaviour) leaked taint through
+                # ``bool ok = is_safe_command(x); system(ok);`` even though the
+                # boolean cannot carry the string's contents.  The semantic
+                # checker separately reports the suspicious conversion.
+                pass
+            else:
+                base = 0
+                for atoms in argument_atoms:
+                    base |= atoms
+                for sanitizer in non_validators:
+                    if sanitizer.argument >= len(call.args):
+                        continue
+                    selected = argument_atoms[sanitizer.argument]
+                    base = (base & ~selected) | self._remove_context(problem, selected, sanitizer.context)
+                result_atoms |= base
 
         # 4) call into the analysed program --------------------------------
         if call.name in self.program.functions:
@@ -1048,15 +1093,26 @@ class TaintEngine:
                     )
                 )
         elif not sources and not sanitizers and not sinks:
-            # Unknown external function: conservative model -- the result may
+            # A call no rule gives a role: conservative model -- the result may
             # depend on any argument, and nothing is assumed to be validated.
             for atoms in argument_atoms:
                 result_atoms |= atoms
             if any(argument_atoms):
-                self.note(
-                    f"call to unknown function '{call.name}': argument taint is propagated to the "
-                    "result and no sanitisation is assumed"
-                )
+                if external_lookup(call.name) is not None:
+                    # The name resolves in the external model (it is typed and
+                    # never SEM008), but without a rule role the taint engine
+                    # has nothing to go on; saying "unknown function" here
+                    # contradicted the semantic layer that did resolve it.
+                    self.note(
+                        f"call to '{call.name}': the external model resolves it, but no rule gives it "
+                        "a taint role, so argument taint is propagated to the result and no "
+                        "sanitisation is assumed"
+                    )
+                else:
+                    self.note(
+                        f"call to unknown function '{call.name}': argument taint is propagated to the "
+                        "result and no sanitisation is assumed"
+                    )
         return result_atoms
 
     def _source_atoms(self, problem: TaintProblem, source: SourceRule) -> int:

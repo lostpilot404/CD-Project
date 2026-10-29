@@ -120,8 +120,16 @@ export function renderAnalyze(container, { state, onRun, onStatus }) {
   const stored = container.querySelector('#filename-input');
   if (state.run && !stored.dataset.touched) stored.value = state.run.filename;
 
+  // The status-area notice (an example was loaded, the Rule Editor's file was
+  // moved over) lives in the state so that re-renders -- including the one the
+  // hash navigation triggers right after those actions -- repaint it instead
+  // of wiping it.
+  const notice = state.analyzeNotice
+    ? el('div', { class: `alert alert--${state.analyzeNotice.kind || 'info'}`, text: state.analyzeNotice.text })
+    : null;
+
   if (!state.run) {
-    render(status, []);
+    render(status, notice ? [notice] : []);
     render(summary, []);
     render(seen, []);
     render(diagnostics, []);
@@ -130,7 +138,10 @@ export function renderAnalyze(container, { state, onRun, onStatus }) {
 
   const run = state.run;
   const metrics = run.metrics || {};
-  render(status, el('span', { text: `Analysed ${run.filename} in ${run.total_analysis_seconds} s (run ${run.run_id}).` }));
+  render(status, [
+    el('span', { text: `Analysed ${run.filename} in ${run.total_analysis_seconds} s (run ${run.run_id}).` }),
+    notice,
+  ]);
   render(summary, [
     el('h2', { text: 'Summary' }),
     el('dl', { class: 'kv' }, [
@@ -206,11 +217,17 @@ export async function openExamplePicker({ onPick }) {
   if (typeof closeButton.focus === 'function') closeButton.focus();
   try {
     const payload = await api.examples();
-    const categories = [...new Set(payload.examples.map((entry) => entry.category))].sort();
+    // This picker fills the *source* editor, so it lists programs only.  The
+    // corpus also ships a rule file (custom_rules/strict_rules.ctrule); loading
+    // that into the source editor analysed rule syntax as CT-C code and reported
+    // a screen of spurious diagnostics.  Rule files belong to the Rule Editor's
+    // own "Load example rule file" button, which fetches it by id.
+    const examples = payload.examples.filter((entry) => entry.id.endsWith('.ctc'));
+    const categories = [...new Set(examples.map((entry) => entry.category))].sort();
     const body = el('div');
     for (const category of categories) {
       body.appendChild(el('p', { class: 'modal__category', text: category }));
-      const items = payload.examples.filter((entry) => entry.category === category);
+      const items = examples.filter((entry) => entry.category === category);
       body.appendChild(el('ul', { class: 'modal__list' }, items.map((entry) =>
         el('li', {}, el('button', {
           type: 'button',

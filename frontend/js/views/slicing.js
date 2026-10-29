@@ -102,6 +102,14 @@ export function renderSlicing(container, { state, onCriterion, onDirection, onSe
       el('thead', {}, el('tr', {}, ['sid', 'line:col', 'function', 'statement', 'why it is included'].map((h) => el('th', { text: h })))),
       el('tbody', {}, rows),
     ]),
+    // The payload caps the per-statement table; the slice itself is complete.
+    // Say so instead of showing fewer rows than the header counts.
+    ...(slice.statements_detail_truncated
+      ? [el('p', {
+          class: 'hint',
+          text: `The table lists the first ${rows.length} of ${slice.statements.length} statements in the slice; the remaining statements are part of the slice but are not detailed here.`,
+        })]
+      : []),
     el('h3', { text: 'Dependency subgraph of the slice' }),
     renderGraph(slice.subgraph || { nodes: [], edges: [] }, {
       kinds: null,

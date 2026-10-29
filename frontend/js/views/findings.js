@@ -104,17 +104,25 @@ function pathView(finding, { loading = false } = {}) {
   ));
 }
 
-export function renderFindingDetail(container, { finding, detail, source, draftSource, onShowSlice, onSelectStatement }) {
+export function renderFindingDetail(container, { finding, detail, source, draftSource, earlierRun, onShowSlice, onSelectStatement }) {
   if (!finding) {
     render(container, el('p', { class: 'empty-state', text: 'Select a finding to see its evidence, the data-flow path and the remediation hint.' }));
     return;
   }
   const record = detail || finding;
+  const fromEarlierRun = Boolean(earlierRun);
   // The line numbers in `record` belong to the analysed text.  If the editor has
   // moved on, say so instead of printing the finding's lines next to other code.
-  const sourceNote = draftSource !== undefined && draftSource !== source
-    ? el('p', { class: 'hint', text: 'The editor has changed since this run: the context below is the text that was analysed, and the line numbers refer to it.' })
-    : null;
+  // A finding of the *earlier* run in a comparison belongs to a source this
+  // page does not have at all.
+  const sourceNote = fromEarlierRun
+    ? el('p', {
+        class: 'alert alert--info',
+        text: `This finding was reported by the earlier run ${earlierRun} and is absent from the run on screen; its line numbers refer to that run's source, which is not displayed here.`,
+      })
+    : (draftSource !== undefined && draftSource !== source
+        ? el('p', { class: 'hint', text: 'The editor has changed since this run: the context below is the text that was analysed, and the line numbers refer to it.' })
+        : null);
   // The run summary lists findings without their evidence path, while the
   // findings list and the detail endpoint include it; the placeholder is only
   // shown when neither has produced a path yet.
@@ -168,26 +176,31 @@ export function renderFindingDetail(container, { finding, detail, source, draftS
     // cannot select the statement behind it, and this page has no statement
     // panel to show it in.  (The handler once treated the line number as a
     // statement id and fetched the wrong statement, invisibly.)
-    renderSource(source, {
+    fromEarlierRun ? null : renderSource(source, {
       highlightLines: pathLines,
       selectedLine: record.sink.line,
       severityByLine: severityByLine([record]),
       maxLines: 2000,
     }),
-    el('div', { class: 'row' }, [
-      el('button', {
-        type: 'button',
-        class: 'button',
-        text: 'Show in Program Graph',
-        on: { click: () => onShowSlice('graph', record) },
-      }),
-      el('button', {
-        type: 'button',
-        class: 'button',
-        text: 'Security slice of this finding',
-        on: { click: () => onShowSlice('slice', record) },
-      }),
-    ]),
+    fromEarlierRun
+      ? el('p', {
+          class: 'hint',
+          text: 'The Program Graph and slicing views show the run on screen, so they are not offered for a finding of the earlier run.',
+        })
+      : el('div', { class: 'row' }, [
+          el('button', {
+            type: 'button',
+            class: 'button',
+            text: 'Show in Program Graph',
+            on: { click: () => onShowSlice('graph', record) },
+          }),
+          el('button', {
+            type: 'button',
+            class: 'button',
+            text: 'Security slice of this finding',
+            on: { click: () => onShowSlice('slice', record) },
+          }),
+        ]),
     el('details', {}, [
       el('summary', { text: 'Evidence record (what justified each hop)' }),
       el('pre', { class: 'mono', text: JSON.stringify(record.evidence, null, 2) }),
@@ -213,13 +226,27 @@ export async function renderFindings(container, { state, onFilter, onSort, onSel
     (state.comparison && (state.comparison.resolved_ids
       || (state.comparison.resolved || []).map((finding) => finding.id))) || [],
   );
-  const filtered = sortFindings(filterFindings(run.findings, state.filters, { resolvedIds }), state.sort);
+  // "Fixed" means "reported by the earlier run, absent from the later one".
+  // When the run on screen *is* the later run, none of its findings can be
+  // fixed and filtering them by that status was always empty -- a dead
+  // filter.  The comparison payload carries the resolved findings as full
+  // records, so the fixed view lists those instead.
+  const comparison = state.comparison;
+  const fixedFromEarlierRun = Boolean(
+    comparison
+    && state.filters.status === 'fixed'
+    && comparison.after && comparison.after.run_id === run.run_id
+    && Array.isArray(comparison.resolved),
+  );
+  const listSource = fixedFromEarlierRun ? comparison.resolved : run.findings;
+  const filtered = sortFindings(filterFindings(listSource, state.filters, { resolvedIds }), state.sort);
   // The count line is cheap to repaint, but the controls are not: rebuilding
   // them on every keystroke in the search box would destroy the focused input
-  // and drop each second character.  The controls only depend on the run and
-  // on whether a comparison exists, so they are rebuilt only when those change
-  // and the count line is repainted every time.
-  const controlsKey = `${run.run_id}|${state.comparison ? 'compared' : 'single'}`;
+  // and drop each second character.  The controls only depend on the run, on
+  // whether a comparison exists and on which list is shown (the current run's
+  // findings or the earlier run's resolved ones), so they are rebuilt only
+  // when those change and the count line is repainted every time.
+  const controlsKey = `${run.run_id}|${state.comparison ? 'compared' : 'single'}|${fixedFromEarlierRun ? 'fixed' : 'normal'}`;
   let count = toolbar.querySelector('.findings-count');
   if (!count) {
     render(toolbar, []);
@@ -227,19 +254,28 @@ export async function renderFindings(container, { state, onFilter, onSort, onSel
     toolbar.appendChild(count);
   }
   render(count, [
-    el('strong', { text: `${filtered.length} of ${run.findings.length} finding(s)` }),
+    el('strong', {
+      text: fixedFromEarlierRun
+        ? `${filtered.length} of ${listSource.length} resolved finding(s) from the earlier run ${comparison.before.run_id}`
+        : `${filtered.length} of ${run.findings.length} finding(s)`,
+    }),
     el('span', { class: 'hint', text: 'Findings are ordered and filtered here; the analysis itself is not recomputed.' }),
   ]);
   if (toolbar.dataset.controlsKey !== controlsKey) {
     const previous = toolbar.querySelector('.findings-controls');
     if (previous) toolbar.removeChild(previous);
     const controls = el('div', { class: 'findings-controls' });
-    renderToolbar(controls, { state, onFilter, onSort, findings: run.findings });
+    renderToolbar(controls, { state, onFilter, onSort, findings: listSource });
     toolbar.appendChild(controls);
     toolbar.dataset.controlsKey = controlsKey;
   }
 
-  if (!run.findings.length) {
+  if (fixedFromEarlierRun && !listSource.length) {
+    render(listNode, el('p', {
+      class: 'empty-state',
+      text: 'The comparison resolved no finding: everything the earlier run reported is still reported now.',
+    }));
+  } else if (!listSource.length) {
     render(listNode, el('p', {
       class: 'alert alert--info',
       text: run.summary.analysis_complete === false
@@ -253,13 +289,24 @@ export async function renderFindings(container, { state, onFilter, onSort, onSel
       filtered.map((finding) => findingCard(finding, finding.id === state.selectedFinding, onSelect))));
   }
 
+  const selectedFinding = filtered.find((f) => f.id === state.selectedFinding) || null;
+  // A resolved finding belongs to the earlier run: its line numbers refer to
+  // that run's source, which this page does not have, and the graph/slice
+  // views show the current run -- so both are withheld with an explanation
+  // rather than silently displaying another run's artefacts.
+  const selectedFromEarlierRun = Boolean(
+    selectedFinding && !(run.findings || []).some((f) => f.id === selectedFinding.id),
+  );
   renderFindingDetail(detailNode, {
-    finding: filtered.find((f) => f.id === state.selectedFinding) || null,
+    finding: selectedFinding,
     detail: state.selectedFindingDetail,
     // The analysed text, not the live draft: the finding's line numbers belong
     // to it, and rendering them beside a newer draft misattributed the result.
-    source: state.analysedSource || state.source,
+    source: selectedFromEarlierRun ? '' : (state.analysedSource || state.source),
     draftSource: state.source,
+    earlierRun: selectedFromEarlierRun && comparison && comparison.before
+      ? comparison.before.run_id
+      : null,
     onShowSlice,
     onSelectStatement,
   });
