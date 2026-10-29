@@ -1,0 +1,7 @@
+// expect: no findings: a validator's boolean result carries no string taint; SEM010 flags the type
+int main() {
+  string name = input();
+  bool ok = is_safe_command(name);
+  system(ok);
+  return 0;
+}

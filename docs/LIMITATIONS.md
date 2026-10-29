@@ -89,7 +89,7 @@ marked partial. Missing separators between statements stay single errors
 
 ### 1.5 Coverage of the evaluation corpus
 
-The measured precision/recall figures in `docs/EVALUATION.md` describe **the 33
+The measured precision/recall figures in `docs/EVALUATION.md` describe **the 36
 hand-written `.ctc` corpus files in `examples/`**, nothing else. They are a
 regression signal for the pipeline, not an estimate of real-world detection
 quality, and the corpus is small enough that a single case moves the numbers by

@@ -39,6 +39,18 @@ The labelled corpus is evaluated with:
 scripts/evaluate.sh                   # table on stdout, JSON evidence in var/
 ```
 
+The regression suites are run with:
+
+```bash
+scripts/test.sh                       # Python suite: parser, dataflow, taint, rules, API (56 tests)
+cd frontend-tests && npm install && npm test   # scripted-DOM suite for the workbench (10 tests)
+```
+
+The frontend suite needs Node ≥ 20 and installs `jsdom` as a dev-only dependency;
+it drives the real `index.html`, the real view code and the real HTTP API inside a
+simulated DOM. It is **not** a substitute for a real browser: the manual procedure
+for visual/interactive acceptance is `docs/MANUAL_BROWSER_VERIFICATION.md`.
+
 ## What it does
 
 | Stage | What is produced |
@@ -70,8 +82,10 @@ codetrace/            the engine
 frontend/             the workbench: nine views, SVG graph renderer, styles, HTML shell
 examples/             the CT-C programs used by the example picker and the corpus
 evaluation/           labels for the corpus and the harness that runs it
+tests/                Python regression suite (unittest discovery, no extra dependencies)
+frontend-tests/       scripted-DOM regression suite for the workbench (Node ≥ 20 + jsdom)
 docs/                 design and reference documentation, screenshots, the project report
-scripts/              server launch and corpus evaluation
+scripts/              server launch, corpus evaluation and the Python test runner
 ```
 
 ## Usage
@@ -96,9 +110,9 @@ by a fingerprint that appears in every run.
 
 ## Results
 
-The engine is evaluated against a corpus of thirty-three CT-C programs with
+The engine is evaluated against a corpus of thirty-six CT-C programs with
 hand-written labels — twenty expected findings across seventeen vulnerable programs,
-one program that exercises a submitted rule file, five safe programs, four sanitised
+one program that exercises a submitted rule file, seven safe programs, five sanitised
 ones, and six programs that must be rejected with a specific diagnostic because they
 use a construct outside the language. All twenty expected findings are reported with
 the expected rule, category and severity; there is no false positive and no false
@@ -119,6 +133,7 @@ mean.
 | `docs/REPORT_SCHEMA.md` | the exported report: keys, finding fields, path steps, stability |
 | `docs/EVALUATION.md` | how the labelled corpus was built and what the measured numbers mean |
 | `docs/LIMITATIONS.md` | what the tool does not do, and the threat model of the tool itself |
+| `docs/MANUAL_BROWSER_VERIFICATION.md` | manual procedure for verifying the workbench in a real browser |
 
 ## The project report
 

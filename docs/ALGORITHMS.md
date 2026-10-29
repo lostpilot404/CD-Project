@@ -29,7 +29,7 @@ scan(source):
   token; identifiers are checked before keywords and keywords by table lookup.
 * **Diagnostics never abort the scan** — a bad escape or unsupported operator is
   recorded and scanning continues, so one mistake does not hide the rest.
-* Measured: the 33 corpus files lex in well under a millisecond each
+* Measured: the 36 corpus files lex in well under a millisecond each
   (0.08–0.25 ms, median ≈ 0.13 ms).
 
 ## 2. NULLABLE / FIRST / FOLLOW fixpoints
@@ -454,7 +454,7 @@ compare(before, after):
 | Slicing (per query) | O(V + E) | 0.001 ms setup |
 | Findings + explanations | O(hits · path) | 0.32 ms (0.24–0.50) |
 
-Whole corpus: 33 files in **≈1.2 s** end to end (≈ 36 ms/file, including rule
+Whole corpus: 36 files in **≈0.9 s** end to end (≈ 25 ms/file, including rule
 loading, JSON serialisation and metric collection) on this machine. Numbers are
 reported per run in `metrics.timings`; the report does not claim better
 performance than it measures, and every timing is wall-clock in this environment

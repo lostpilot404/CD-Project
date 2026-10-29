@@ -1,0 +1,10 @@
+// expect: no findings: the else branch of if (1) is statically impossible and is disclosed as pruned
+int main() {
+  string name = input();
+  if (1) {
+    return 0;
+  } else {
+    system(name);
+  }
+  return 0;
+}

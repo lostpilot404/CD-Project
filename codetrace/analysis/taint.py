@@ -1061,11 +1061,18 @@ class TaintEngine:
                 base = 0
                 for atoms in argument_atoms:
                     base |= atoms
+                # Compose the kills: each rule removes exactly the atoms of
+                # its declared context from its declared argument.  Rebuilding
+                # ``base`` from the *original* argument atoms per rule (the
+                # previous form) let a second rule re-add what the first had
+                # removed: merging a custom sql-context sanitizer over the
+                # built-in command-context shell_escape lost the command kill.
                 for sanitizer in non_validators:
                     if sanitizer.argument >= len(call.args):
                         continue
                     selected = argument_atoms[sanitizer.argument]
-                    base = (base & ~selected) | self._remove_context(problem, selected, sanitizer.context)
+                    kept = self._remove_context(problem, selected, sanitizer.context)
+                    base &= ~(selected & ~kept)
                 result_atoms |= base
 
         # 4) call into the analysed program --------------------------------

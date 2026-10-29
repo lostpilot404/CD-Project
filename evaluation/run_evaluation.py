@@ -11,7 +11,9 @@ case and compares the outcome with those labels.  It measures:
   report is empty count as true negatives; a finding in such a case is a false
   positive at file level;
 * **diagnostics** -- whether the expected diagnostic codes appear, which is how
-  unsupported and malformed input is checked;
+  unsupported and malformed input is checked; a case may also *forbid* codes of
+  any severity (``forbidden_diagnostics``, e.g. a false DFA001 that must never
+  appear) and pin the engine's completeness verdict (``analysis_complete``);
 * **precision / recall / F1** -- with explicit handling of the zero-denominator
   case (when nothing was predicted or nothing was expected, the metric is
   reported as ``null`` with a note rather than as 0 or 1).
@@ -127,6 +129,18 @@ def run_case(case: Dict[str, object]) -> dict:
     unexpected_errors = [
         d.code for d in diagnostics if d.severity == "error" and d.code not in expected_codes
     ]
+    # A case may forbid codes of *any* severity: a warning that must never
+    # appear (a false DFA001, say) would otherwise pass unnoticed, because
+    # only error-severity codes are checked above.
+    forbidden_codes = list(case.get("forbidden_diagnostics") or [])
+    forbidden_present = sorted({code for code in forbidden_codes if code in codes})
+    # And a case may pin the engine's own completeness verdict, so "the run
+    # says the analysis was complete" becomes a checked claim, not a hope.
+    expected_complete = case.get("analysis_complete")
+    complete_mismatch = (
+        expected_complete is not None
+        and program.analysis_complete != bool(expected_complete)
+    )
     min_syntax_errors = int(case.get("min_syntax_errors") or 0)
     syntax_errors = [d for d in diagnostics if d.code.startswith("SYN")]
     if len(syntax_errors) < min_syntax_errors:
@@ -153,6 +167,13 @@ def run_case(case: Dict[str, object]) -> dict:
         reasons.append(f"expected diagnostics missing: {', '.join(missing_codes)}")
     if unexpected_errors:
         reasons.append(f"unexpected error diagnostics: {', '.join(sorted(set(unexpected_errors)))}")
+    if forbidden_present:
+        reasons.append(f"forbidden diagnostics present: {', '.join(forbidden_present)}")
+    if complete_mismatch:
+        reasons.append(
+            f"analysis_complete is {program.analysis_complete}, "
+            f"expected {bool(expected_complete)}"
+        )
     if file_level_fp:
         reasons.append("a finding was reported in a case labelled safe/sanitized")
 
@@ -173,6 +194,10 @@ def run_case(case: Dict[str, object]) -> dict:
         "expected_diagnostic_codes": expected_codes,
         "missing_diagnostic_codes": missing_codes,
         "unexpected_error_codes": unexpected_errors,
+        "forbidden_diagnostic_codes": forbidden_codes,
+        "forbidden_diagnostic_codes_present": forbidden_present,
+        "analysis_complete": program.analysis_complete,
+        "expected_analysis_complete": expected_complete,
         "true_positives": true_positives,
         "false_positives": false_positives,
         "false_negatives": false_negatives,
@@ -223,6 +248,7 @@ def evaluate(verbose: bool = True) -> dict:
         r["file"]
         for r in results
         if r.get("missing_diagnostic_codes") or r.get("unexpected_error_codes")
+        or r.get("forbidden_diagnostic_codes_present")
     ]
 
     report = {
